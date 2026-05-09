@@ -136,7 +136,7 @@ function PhotoCheer(){
    ========================================================= */
 function OnboardingDesktop({ onDone }){
   return (
-    <div style={{ height:'100%', background:'var(--paper)', display:'flex', flexDirection:'column' }} className="paper-grain">
+    <div style={{ minHeight:'100%', background:'var(--paper)', display:'flex', flexDirection:'column' }} className="paper-grain">
       {/* Top mast */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 32px', borderBottom:'1.5px solid var(--ink)' }}>
         <span className="mono" style={{ fontSize:11, letterSpacing:'.18em' }}>SUPREMA GAMING · BOLETIM Nº 04</span>
@@ -145,14 +145,14 @@ function OnboardingDesktop({ onDone }){
       </div>
 
       {/* Hero grid */}
-      <div style={{ flex:1, display:'grid', gridTemplateColumns:'1.05fr 1fr', minHeight:0 }}>
+      <div style={{ flex:1, display:'grid', gridTemplateColumns:'1.05fr 1fr', minHeight: 620 }}>
         {/* Left — type column */}
-        <div style={{ padding:'40px 48px 32px', display:'flex', flexDirection:'column', gap:18 }}>
+        <div style={{ padding:'40px 48px 32px', display:'flex', flexDirection:'column', gap:18, overflow:'hidden' }}>
           <Logo height={56}/>
           <div className="serif-it" style={{ fontSize: 34, lineHeight: 1, color:'var(--green-deep)' }}>
             87 colegas. 64 jogos. <br/>uma taça (simbólica).
           </div>
-          <h1 className="display" style={{ margin:0, fontSize: 'clamp(86px, 10vw, 168px)', lineHeight:.84, letterSpacing:'-.01em' }}>
+          <h1 className="display" style={{ margin:0, fontSize: 'clamp(72px, 7.5vw, 130px)', lineHeight:.84, letterSpacing:'-.01em' }}>
             <div>O BOLÃO</div>
             <div style={{ color:'var(--green-deep)' }}>DA FIRMA</div>
             <div style={{ display:'flex', gap:14, alignItems:'baseline' }}>
@@ -168,7 +168,7 @@ function OnboardingDesktop({ onDone }){
             <button onClick={onDone} className="btn-yellow" style={{ padding:'18px 24px', fontSize:15 }}>ENTRAR NO BOLÃO →</button>
             <button className="btn-ghost">VER REGRAS · 5 MIN</button>
           </div>
-          <div style={{ display:'flex', gap:32, marginTop:'auto', borderTop:'1.5px solid var(--ink)', paddingTop:18 }}>
+          <div style={{ display:'flex', gap:32, marginTop:40, borderTop:'1.5px solid var(--ink)', paddingTop:18 }}>
             <Stat n="87" l="colegas inscritos"/>
             <Stat n="64" l="jogos pra palpitar"/>
             <Stat n="48" l="seleções no torneio"/>
