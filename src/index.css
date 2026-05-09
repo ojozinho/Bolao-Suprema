@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans;
+    margin: 0;
+    min-height: 100dvh;
+  }
+
+  #root {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(13,13,13,0.2); border-radius: 999px; }
+}
+
+@layer components {
+  /* Buttons */
+  .btn-yellow {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-3
+           bg-yellow text-ink font-mono text-[11px] font-bold tracking-eyebrow uppercase
+           border-2 border-ink shadow-btn
+           transition-all duration-100 cursor-pointer select-none;
+  }
+  .btn-yellow:hover { @apply shadow-btn-hover -translate-x-px -translate-y-px; }
+  .btn-yellow:active { @apply shadow-btn-active translate-x-0.5 translate-y-0.5; }
+
+  .btn-ink {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-3
+           bg-ink text-paper font-mono text-[11px] font-bold tracking-eyebrow uppercase
+           border-2 border-ink
+           transition-all duration-100 cursor-pointer select-none;
+  }
+  .btn-ink:hover { @apply bg-ink-2; }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-3
+           bg-transparent text-ink font-mono text-[11px] font-bold tracking-eyebrow uppercase
+           border-2 border-ink
+           transition-all duration-100 cursor-pointer select-none;
+  }
+  .btn-ghost:hover { @apply bg-hairline; }
+
+  /* Score cell (prediction incrementer) */
+  .score-cell {
+    @apply w-14 h-14 flex items-center justify-center
+           font-display text-4xl text-ink border-2 border-ink
+           transition-colors cursor-default select-none;
+  }
+  .score-cell.active {
+    @apply bg-yellow;
+  }
+
+  /* Paper grain texture */
+  .paper-grain {
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(120,72,0,.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(80,60,0,.05) 0%, transparent 40%),
+      radial-gradient(ellipse at 50% 80%, rgba(100,80,20,.03) 0%, transparent 60%);
+  }
+
+  /* Pitch turf */
+  .pitch-turf {
+    background-image: repeating-linear-gradient(
+      0deg, transparent, transparent 24px,
+      rgba(0,0,0,.06) 24px, rgba(0,0,0,.06) 25px
+    );
+  }
+
+  /* Live badge */
+  .live-dot {
+    @apply inline-block w-2 h-2 rounded-full bg-red animate-pulse-live;
+  }
+}
+
+@layer utilities {
+  .font-display { font-family: theme('fontFamily.display'); }
+  .font-serif-it { font-family: theme('fontFamily.serif'); font-style: italic; }
+  .tracking-eyebrow { letter-spacing: theme('letterSpacing.eyebrow'); }
+}
