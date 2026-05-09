@@ -11,7 +11,7 @@ export function Logo({ height = 40, className }: LogoProps) {
       src={asset('assets/logo-bolao.png')}
       alt="Bolão da Suprema"
       height={height}
-      style={{ height, width: 'auto' }}
+      style={{ height, width: 'auto', maxWidth: 'none' }}
       className={className}
     />
   )
