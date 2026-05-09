@@ -17,22 +17,31 @@ const slides = [
     body: 'Palpite nos jogos, monte sua chave e dispute com toda a firma quem manja mais de bola.',
   },
   {
-    eyebrow: '02 · COMO FUNCIONA',
-    stamp: '87 NA FIRMA',
+    eyebrow: '02 · COMO PONTUAR',
+    stamp: 'AO VIVO',
     head: ['PALPITA,', 'PONTUA,', 'DOMINA'],
-    kicker: 'Sistema de pontos',
-    body: 'Acertou o vencedor? +3. Acertou o placar? +5. Montou a chave certinha? Bônus na conta.',
+    kicker: 'Cada jogo, novos pontos',
+    body: 'Placar exato? +10 pts. Acertou o resultado? +5 pts. Apostou no campeão? +25 pts. É a Copa toda valendo.',
   },
   {
     eyebrow: '03 · BORA',
-    stamp: 'FREE FIRE',
-    head: ['64 JOGOS,', '48 SELEÇÕES,', '1 CAMPEÃO'],
-    kicker: 'Começa agora',
-    body: 'Cria seu perfil, escolhe seu campeão e entra na disputa. Quem sabe mais de futebol aqui?',
+    stamp: '11 JUN',
+    head: ['72 JOGOS,', '48 SELEÇÕES,', '1 CAMPEÃO'],
+    kicker: 'Fase de grupos a partir de 11 Jun · 15h',
+    body: 'Cria seu perfil, faz suas apostas gerais e entra na disputa. Quem sabe mais de futebol aqui?',
   },
 ]
 
-const MARQUEE_ITEMS = ['14:00 BRA × KOR', '16:00 FRA × SEN', '18:00 GER × MEX', '20:00 ENG × COL', 'OITAVAS · 03 JUL']
+const MARQUEE_ITEMS = [
+  'COPA DO MUNDO 2026',
+  'USA · CAN · MEX',
+  '48 SELEÇÕES',
+  '72 JOGOS NA FASE DE GRUPOS',
+  'APOSTAS ABERTAS',
+  'FASE DE GRUPOS · 11 JUN',
+  'FINAL · 19 JUL',
+  'BORA JOGAR →',
+]
 
 export function OnboardingScreen() {
   const isDesktop = useIsDesktop()
@@ -48,7 +57,6 @@ function OnboardingMobile() {
 
   return (
     <div className="min-h-dvh flex flex-col bg-paper">
-      {/* Hero image */}
       <div className="relative h-72 overflow-hidden flex-shrink-0">
         <img
           src={asset('assets/hero-jogadores.webp')}
@@ -64,7 +72,6 @@ function OnboardingMobile() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 flex flex-col px-5 pt-2 pb-6">
         <AnimatePresence mode="wait">
           <motion.div
@@ -84,7 +91,7 @@ function OnboardingMobile() {
                   key={i}
                   className="block"
                   style={{
-                    color: i === 1 ? 'var(--tw-color-green-deep, #007A3E)' : undefined,
+                    color: i === 1 ? '#007A3E' : undefined,
                     transform: i % 2 === 1 ? 'translateX(8px)' : undefined,
                   }}
                 >
@@ -97,7 +104,6 @@ function OnboardingMobile() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Progress */}
         <div className="flex gap-1.5 mb-4">
           {slides.map((_, i) => (
             <div
@@ -108,7 +114,6 @@ function OnboardingMobile() {
           ))}
         </div>
 
-        {/* Actions */}
         <div className="flex gap-2">
           {step > 0 && (
             <button onClick={() => setStep(step - 1)} className="btn-ghost flex-1">
@@ -137,9 +142,7 @@ function OnboardingDesktop() {
 
   return (
     <div className="min-h-dvh flex flex-col bg-paper">
-      {/* Main split */}
       <div className="flex flex-1">
-        {/* Left — Editorial */}
         <div className="flex flex-col justify-between p-12 flex-1 max-w-[52%]">
           <div>
             <Logo height={48} />
@@ -155,19 +158,18 @@ function OnboardingDesktop() {
               </h1>
               <p className="text-ink-2 text-lg leading-relaxed max-w-md">
                 Palpite nos jogos, monte sua chave e dispute com toda a firma quem manja mais de bola.
-                64 jogos. 48 seleções. 1 campeão.
+                72 jogos na fase de grupos. 48 seleções. 1 campeão.
               </p>
             </div>
           </div>
 
-          {/* Stats */}
           <div>
             <div className="grid grid-cols-4 gap-4 mb-8 border-t border-hairline pt-6">
               {[
-                { val: '87', label: 'colegas' },
-                { val: '64', label: 'jogos' },
-                { val: '48', label: 'seleções' },
-                { val: '+50', label: 'pts bônus' },
+                { val: '104',   label: 'partidas' },
+                { val: '48',    label: 'seleções' },
+                { val: '11 Jun', label: 'início' },
+                { val: '+25',   label: 'pts campeão' },
               ].map(({ val, label }) => (
                 <div key={label}>
                   <div className="font-display text-4xl">{val}</div>
@@ -181,21 +183,22 @@ function OnboardingDesktop() {
           </div>
         </div>
 
-        {/* Right — Hero image */}
         <div className="relative flex-1 overflow-hidden">
           <img
             src={asset('assets/hero-jogadores.webp')}
             alt="Copa do Mundo 2026"
             className="absolute inset-0 w-full h-full object-cover object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-paper via-transparent to-transparent" style={{ width: '30%' }} />
+          <div
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-paper to-transparent"
+            style={{ width: '30%' }}
+          />
           <div className="absolute bottom-8 left-8">
             <Stamp color="#FFCB05" rotation={-1}>COPA 2026</Stamp>
           </div>
         </div>
       </div>
 
-      {/* Marquee footer */}
       <div className="border-t border-line bg-ink">
         <Marquee items={MARQUEE_ITEMS} color="#FFCB05" bg="#0D0D0D" speed={30} />
       </div>
