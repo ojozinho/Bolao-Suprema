@@ -32,19 +32,10 @@ export const useAuthStore = create<AuthState>()(
           profileComplete: !!(user?.firstName && user?.dept),
         }),
 
-      signInWithEmail: async (email: string) => {
-        if (isMockMode) {
-          // Mock login — simulate magic link success
-          set({ user: MOCK_ME, isAuthenticated: true, profileComplete: true })
-          return {}
-        }
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: {
-            emailRedirectTo: `${window.location.origin}/Bolao-Suprema/#/profile`,
-          },
-        })
-        return error ? { error: error.message } : {}
+      signInWithEmail: async (_email: string) => {
+        // TODO: remove bypass and restore OTP when enabling real auth
+        set({ user: MOCK_ME, isAuthenticated: true, profileComplete: true })
+        return {}
       },
 
       signOut: async () => {
