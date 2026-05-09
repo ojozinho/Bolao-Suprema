@@ -19,4 +19,7 @@ export const supabase = createClient(
   }
 )
 
-export const isMockMode = !supabaseUrl || !supabaseAnonKey
+// Set VITE_MOCK_AUTH=true in .env.local to bypass real Supabase auth during development.
+// Remove the flag (or set it to false) when ready for production auth.
+export const isMockMode =
+  import.meta.env.VITE_MOCK_AUTH === 'true' || !supabaseUrl || !supabaseAnonKey
