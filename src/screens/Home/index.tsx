@@ -2,7 +2,10 @@ import { useNavigate } from 'react-router-dom'
 import { Flag } from '@/components/shared/Flag'
 import { Marquee } from '@/components/shared/Marquee'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
+import { useAuthStore } from '@/stores/auth.store'
+import { usePredictionStore } from '@/stores/prediction.store'
 import { MOCK_UPCOMING } from '@/data/mock'
+import { WC2026_MATCHES } from '@/data/wc2026'
 import { asset, cn } from '@/lib/utils'
 
 const TOURNAMENT_START = new Date('2026-06-11T15:00:00')
@@ -29,18 +32,41 @@ export function HomeScreen() {
   return isDesktop ? <HomeDesktop /> : <HomeMobile />
 }
 
+// ─── Prediction progress bar ──────────────────────────────────────────────────
+
+function PredProgress({ done, total, label }: { done: number; total: number; label: string }) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="font-mono text-[10px] text-ink-3 tracking-eyebrow">{label}</span>
+        <span className="font-mono text-[10px] font-bold text-ink">{done}/{total}</span>
+      </div>
+      <div className="h-1 bg-hairline overflow-hidden">
+        <div className="h-full bg-green transition-all duration-500" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
 // ─── Mobile ───────────────────────────────────────────────────────────────────
 
 function HomeMobile() {
   const navigate = useNavigate()
+  const user = useAuthStore(s => s.user)
+  const { predictions, championPick, vicePick, scorerPick } = usePredictionStore()
   const upcoming = MOCK_UPCOMING
   const days = daysUntil(TOURNAMENT_START)
+
+  const totalMatches = WC2026_MATCHES.length
+  const totalPredictions = Object.keys(predictions).length
+  const apostasFeitas = [championPick, vicePick, scorerPick].filter(Boolean).length
 
   return (
     <div className="min-h-dvh bg-paper pb-24">
 
       {/* ── Hero — countdown ── */}
-      <section className="relative overflow-hidden" style={{ height: 300 }}>
+      <section className="relative overflow-hidden" style={{ height: 280 }}>
         <img
           src={asset('assets/hero-jogadores.webp')}
           alt=""
@@ -59,18 +85,19 @@ function HomeMobile() {
 
       <div className="px-4 space-y-3 pt-4">
 
-        {/* ── CTA palpite ── */}
-        <div className="bg-yellow border-2 border-ink p-4 flex items-start justify-between gap-3">
-          <div>
-            <div className="font-mono text-[10px] tracking-eyebrow text-ink-3 mb-1">APOSTAS ABERTAS</div>
-            <div className="leading-none">
-              <span className="font-display text-4xl text-ink">{upcoming.length} JOGOS</span>
-              <br />
-              <span className="font-serif-it text-xl text-green-deep">esperando você</span>
-            </div>
+        {/* ── Progresso do usuário ── */}
+        <div className="border-2 border-ink p-4 space-y-3">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="font-display text-lg">OLÁ{user?.firstName ? `, ${user.firstName.toUpperCase()}` : ''}!</span>
+            <span className="font-serif-it text-sm text-ink-3">veja seu progresso</span>
           </div>
-          <button onClick={() => navigate('/prediction')} className="btn-ink text-[11px] px-4 py-2.5 flex-shrink-0 mt-1">
-            PALPITAR →
+          <PredProgress done={totalPredictions} total={totalMatches} label="PALPITES DA FASE DE GRUPOS" />
+          <PredProgress done={apostasFeitas} total={3} label="APOSTAS GERAIS" />
+          {(totalPredictions === 0 && apostasFeitas === 0) && (
+            <p className="font-mono text-[10px] text-ink-3">Nenhum palpite feito ainda. Comece agora!</p>
+          )}
+          <button onClick={() => navigate('/prediction')} className="btn-yellow w-full justify-center text-[11px] mt-1">
+            {totalPredictions === 0 ? 'COMEÇAR A PALPITAR →' : 'CONTINUAR PALPITANDO →'}
           </button>
         </div>
 
@@ -81,42 +108,47 @@ function HomeMobile() {
             <span className="font-serif-it text-sm text-ink-3">jogos</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            {upcoming.slice(0, 4).map(match => (
-              <button
-                key={match.id}
-                onClick={() => navigate('/prediction')}
-                className="border-2 border-ink p-3 flex items-center gap-2 hover:-translate-y-px transition-transform text-left"
-              >
-                <Flag team={match.home} size={22} />
-                <span className="font-mono text-[10px] font-bold">{match.home.code}</span>
-                <span className="font-mono text-[9px] text-ink-4 mx-0.5">×</span>
-                <span className="font-mono text-[10px] font-bold">{match.away.code}</span>
-                <Flag team={match.away} size={22} />
-              </button>
-            ))}
+            {upcoming.slice(0, 4).map(match => {
+              const hasPick = !!predictions[match.id]
+              return (
+                <button
+                  key={match.id}
+                  onClick={() => navigate('/prediction')}
+                  className={cn(
+                    'border-2 p-3 flex items-center gap-2 hover:-translate-y-px transition-transform text-left',
+                    hasPick ? 'border-green bg-green/5' : 'border-ink'
+                  )}
+                >
+                  <Flag team={match.home} size={22} />
+                  <span className="font-mono text-[10px] font-bold">{match.home.code}</span>
+                  <span className="font-mono text-[9px] text-ink-4 mx-0.5">×</span>
+                  <span className="font-mono text-[10px] font-bold">{match.away.code}</span>
+                  <Flag team={match.away} size={22} />
+                  {hasPick && <span className="font-mono text-[8px] text-green ml-auto">✓</span>}
+                </button>
+              )
+            })}
           </div>
-          {upcoming.length > 4 && (
-            <button onClick={() => navigate('/prediction')} className="mt-2 font-mono text-[10px] text-ink-3 hover:text-ink tracking-eyebrow">
-              + {upcoming.length - 4} JOGOS RESTANTES →
-            </button>
-          )}
+          <button onClick={() => navigate('/prediction')} className="mt-2 font-mono text-[10px] text-ink-3 hover:text-ink tracking-eyebrow">
+            VER TODOS OS {totalMatches} JOGOS →
+          </button>
         </div>
 
-        {/* ── Ranking — empty state ── */}
-        <div className="border-2 border-ink p-4">
-          <div className="flex items-baseline justify-between mb-1">
-            <div className="flex items-baseline gap-2">
-              <span className="font-display text-lg">RANKING</span>
-              <span className="font-serif-it text-sm text-ink-3">em breve</span>
-            </div>
-            <button onClick={() => navigate('/ranking')} className="font-mono text-[10px] text-ink-4 hover:text-ink tracking-eyebrow">
-              VER →
+        {/* ── Apostas gerais CTA ── */}
+        {apostasFeitas < 3 && (
+          <div className="border-2 border-yellow bg-yellow/10 p-4">
+            <div className="font-mono text-[10px] tracking-eyebrow text-ink-3 mb-1">APOSTAS GERAIS · OBRIGATÓRIO</div>
+            <p className="font-display text-xl text-ink leading-tight mb-2">
+              CAMPEÃO · VICE · ARTILHEIRO
+            </p>
+            <p className="font-mono text-[10px] text-ink-3 mb-3">
+              Prazo: antes de 11 Jun · 15:00 · vale até +50 pontos
+            </p>
+            <button onClick={() => navigate('/prediction')} className="btn-ink text-[11px] w-full justify-center">
+              FAZER APOSTAS GERAIS →
             </button>
           </div>
-          <p className="font-mono text-[11px] text-ink-3 py-4 text-center leading-relaxed">
-            Os pontos aparecem aqui quando os jogos começarem.
-          </p>
-        </div>
+        )}
 
         {/* ── Bracket CTA ── */}
         <div className="border-2 border-ink p-4 flex items-center justify-between gap-3">
@@ -143,8 +175,14 @@ function HomeMobile() {
 
 function HomeDesktop() {
   const navigate = useNavigate()
+  const user = useAuthStore(s => s.user)
+  const { predictions, championPick, vicePick, scorerPick } = usePredictionStore()
   const upcoming = MOCK_UPCOMING
   const days = daysUntil(TOURNAMENT_START)
+
+  const totalMatches = WC2026_MATCHES.length
+  const totalPredictions = Object.keys(predictions).length
+  const apostasFeitas = [championPick, vicePick, scorerPick].filter(Boolean).length
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -181,23 +219,48 @@ function HomeDesktop() {
             </div>
           </div>
 
-          {/* CTA — apostas abertas */}
-          <div className="relative overflow-hidden border-2 border-ink flex flex-col justify-between p-6 bg-green">
+          {/* Progresso */}
+          <div className="border-2 border-ink bg-ink text-paper flex flex-col p-6 gap-4">
             <div>
-              <div className="font-mono text-[10px] tracking-eyebrow text-paper/60 mb-3">APOSTAS ABERTAS</div>
-              <div className="leading-none">
-                <div className="font-display text-[72px] text-paper leading-none">{upcoming.length}</div>
-                <div className="font-display text-3xl text-paper">JOGOS</div>
-                <div className="font-serif-it text-xl text-yellow mt-1">esperando você</div>
+              <div className="font-mono text-[10px] tracking-eyebrow text-paper/40 mb-1">
+                OLÁ{user?.firstName ? `, ${user.firstName.toUpperCase()}` : ''}!
+              </div>
+              <div className="font-display text-4xl leading-none">{totalPredictions}</div>
+              <div className="font-serif-it text-paper/60 text-sm">de {totalMatches} palpites feitos</div>
+            </div>
+
+            <div className="space-y-3 flex-1">
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="font-mono text-[9px] text-paper/40 tracking-eyebrow">GRUPOS</span>
+                  <span className="font-mono text-[9px] text-paper/60">{totalPredictions}/{totalMatches}</span>
+                </div>
+                <div className="h-1 bg-paper/10 overflow-hidden">
+                  <div className="h-full bg-yellow transition-all" style={{ width: `${totalMatches > 0 ? (totalPredictions / totalMatches) * 100 : 0}%` }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="font-mono text-[9px] text-paper/40 tracking-eyebrow">APOSTAS GERAIS</span>
+                  <span className="font-mono text-[9px] text-paper/60">{apostasFeitas}/3</span>
+                </div>
+                <div className="h-1 bg-paper/10 overflow-hidden">
+                  <div className="h-full bg-green transition-all" style={{ width: `${(apostasFeitas / 3) * 100}%` }} />
+                </div>
               </div>
             </div>
-            <div>
-              <p className="font-mono text-[11px] text-paper/60 mb-4 leading-relaxed">
-                Não fique de fora. Cada jogo é ponto no bolso.
-              </p>
+
+            <div className="space-y-2">
               <button onClick={() => navigate('/prediction')} className="btn-yellow w-full justify-center">
-                PALPITAR AGORA →
+                {totalPredictions === 0 ? 'COMEÇAR →' : 'CONTINUAR →'}
               </button>
+              {apostasFeitas < 3 && (
+                <div className="border border-yellow/30 p-2 text-center">
+                  <span className="font-mono text-[9px] text-yellow tracking-eyebrow">
+                    ⚠ APOSTAS GERAIS PENDENTES
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -231,40 +294,47 @@ function HomeDesktop() {
               <span className="font-serif-it text-sm text-ink-3">jogos · grupo</span>
             </div>
             <div className="divide-y divide-hairline">
-              {upcoming.slice(0, 6).map(match => (
-                <button
-                  key={match.id}
-                  onClick={() => navigate('/prediction')}
-                  className="w-full flex items-center gap-4 px-4 py-3 hover:bg-hairline transition-colors text-left group"
-                >
-                  <div className="flex-shrink-0 w-14 text-center">
-                    <div className="font-mono text-[9px] text-ink-4 tracking-eyebrow">GRUPO {match.group}</div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <Flag team={match.home} size={26} />
-                    <div className="min-w-0">
-                      <div className="font-mono text-[12px] font-bold truncate">{match.home.name}</div>
+              {upcoming.slice(0, 6).map(match => {
+                const hasPick = !!predictions[match.id]
+                return (
+                  <button
+                    key={match.id}
+                    onClick={() => navigate('/prediction')}
+                    className={cn(
+                      'w-full flex items-center gap-4 px-4 py-3 transition-colors text-left group',
+                      hasPick ? 'bg-green/5 hover:bg-green/10' : 'hover:bg-hairline'
+                    )}
+                  >
+                    <div className="flex-shrink-0 w-14 text-center">
+                      <div className="font-mono text-[9px] text-ink-4 tracking-eyebrow">GRUPO {match.group}</div>
                     </div>
-                  </div>
-                  <div className="text-center flex-shrink-0 px-2">
-                    <div className="font-mono text-[9px] text-ink-4 tracking-eyebrow">{match.date}</div>
-                    <div className="font-display text-lg leading-none">{match.time}</div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-                    <div className="min-w-0 text-right">
-                      <div className="font-mono text-[12px] font-bold truncate">{match.away.name}</div>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <Flag team={match.home} size={26} />
+                      <div className="min-w-0">
+                        <div className="font-mono text-[12px] font-bold truncate">{match.home.name}</div>
+                      </div>
                     </div>
-                    <Flag team={match.away} size={26} />
-                  </div>
-                  <span className="font-mono text-[10px] text-ink-4 group-hover:text-ink transition-colors flex-shrink-0">→</span>
-                </button>
-              ))}
+                    <div className="text-center flex-shrink-0 px-2">
+                      <div className="font-mono text-[9px] text-ink-4 tracking-eyebrow">{match.date}</div>
+                      <div className="font-display text-lg leading-none">{match.time}</div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                      <div className="min-w-0 text-right">
+                        <div className="font-mono text-[12px] font-bold truncate">{match.away.name}</div>
+                      </div>
+                      <Flag team={match.away} size={26} />
+                    </div>
+                    {hasPick
+                      ? <span className="font-mono text-[10px] text-green flex-shrink-0">✓</span>
+                      : <span className="font-mono text-[10px] text-ink-4 group-hover:text-ink transition-colors flex-shrink-0">→</span>
+                    }
+                  </button>
+                )
+              })}
             </div>
-            {upcoming.length > 6 && (
-              <button onClick={() => navigate('/prediction')} className="w-full px-4 py-2.5 font-mono text-[10px] text-ink-3 hover:text-ink tracking-eyebrow border-t border-hairline text-center">
-                + {upcoming.length - 6} MAIS →
-              </button>
-            )}
+            <button onClick={() => navigate('/prediction')} className="w-full px-4 py-2.5 font-mono text-[10px] text-ink-3 hover:text-ink tracking-eyebrow border-t border-hairline text-center">
+              VER TODOS OS {totalMatches} JOGOS →
+            </button>
           </div>
 
           {/* Bracket CTA */}
@@ -274,9 +344,9 @@ function HomeDesktop() {
               <span className="font-serif-it text-sm text-ink-3">mata-mata</span>
             </div>
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4">
-              <div className="font-mono text-[11px] text-ink-3 leading-relaxed">
+              <p className="font-mono text-[11px] text-ink-3 leading-relaxed">
                 Oitavas a partir de 27 Jun. Palpite no mata-mata já disponível.
-              </div>
+              </p>
               <button onClick={() => navigate('/bracket')} className="btn-yellow w-full justify-center">
                 VER CHAVEAMENTO →
               </button>

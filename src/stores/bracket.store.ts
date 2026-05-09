@@ -19,28 +19,45 @@ interface BracketState {
   ) => { home: TeamCode | null; away: TeamCode | null }
 }
 
-// Bracket adjacency: which R16 slots feed which QF slots
+// WC2026: 16 R16 → 8 QF → 4 SF → Final
+// Each QF picks winner from 2 R16 slots
 const R16_TO_QF: Record<number, { qfPosition: number; side: 'home' | 'away' }> = {
-  1: { qfPosition: 1, side: 'home' },
-  2: { qfPosition: 1, side: 'away' },
-  3: { qfPosition: 2, side: 'home' },
-  4: { qfPosition: 2, side: 'away' },
-  5: { qfPosition: 3, side: 'home' },
-  6: { qfPosition: 3, side: 'away' },
-  7: { qfPosition: 4, side: 'home' },
-  8: { qfPosition: 4, side: 'away' },
+  1:  { qfPosition: 1, side: 'home' },
+  2:  { qfPosition: 1, side: 'away' },
+  3:  { qfPosition: 2, side: 'home' },
+  4:  { qfPosition: 2, side: 'away' },
+  5:  { qfPosition: 3, side: 'home' },
+  6:  { qfPosition: 3, side: 'away' },
+  7:  { qfPosition: 4, side: 'home' },
+  8:  { qfPosition: 4, side: 'away' },
+  9:  { qfPosition: 5, side: 'home' },
+  10: { qfPosition: 5, side: 'away' },
+  11: { qfPosition: 6, side: 'home' },
+  12: { qfPosition: 6, side: 'away' },
+  13: { qfPosition: 7, side: 'home' },
+  14: { qfPosition: 7, side: 'away' },
+  15: { qfPosition: 8, side: 'home' },
+  16: { qfPosition: 8, side: 'away' },
 }
 
+// Each SF picks winner from 2 QF slots
 const QF_TO_SF: Record<number, { sfPosition: number; side: 'home' | 'away' }> = {
   1: { sfPosition: 1, side: 'home' },
   2: { sfPosition: 1, side: 'away' },
   3: { sfPosition: 2, side: 'home' },
   4: { sfPosition: 2, side: 'away' },
+  5: { sfPosition: 3, side: 'home' },
+  6: { sfPosition: 3, side: 'away' },
+  7: { sfPosition: 4, side: 'home' },
+  8: { sfPosition: 4, side: 'away' },
 }
 
+// Each final slot picks winner from 2 SF slots (semifinais)
 const SF_TO_FINAL: Record<number, { side: 'home' | 'away' }> = {
   1: { side: 'home' },
   2: { side: 'away' },
+  3: { side: 'home' },  // 3rd place match home
+  4: { side: 'away' },  // 3rd place match away
 }
 
 export const useBracketStore = create<BracketState>()(
@@ -77,19 +94,18 @@ export const useBracketStore = create<BracketState>()(
         // For a QF slot, find the two R16 picks that feed it
         if (slotId.startsWith('qf_')) {
           const position = parseInt(slotId.replace('qf_', ''))
-          const r16Homes = Object.entries(R16_TO_QF)
-            .filter(([, v]) => v.qfPosition === position && v.side === 'home')
-            .map(([k]) => `r16_${k}`)
-          const r16Aways = Object.entries(R16_TO_QF)
-            .filter(([, v]) => v.qfPosition === position && v.side === 'away')
-            .map(([k]) => `r16_${k}`)
+          const r16Home = Object.entries(R16_TO_QF)
+            .find(([, v]) => v.qfPosition === position && v.side === 'home')?.[0]
+          const r16Away = Object.entries(R16_TO_QF)
+            .find(([, v]) => v.qfPosition === position && v.side === 'away')?.[0]
 
-          const homeSlotId = r16Homes[0]
-          const awaySlotId = r16Aways[0]
+          if (!r16Home || !r16Away) return { home: null, away: null }
+
+          const homeSlotId = `r16_${r16Home}`
+          const awaySlotId = `r16_${r16Away}`
           const homeSlot = getSlot(homeSlotId)
           const awaySlot = getSlot(awaySlotId)
 
-          // Use real winner if known, else use user's pick
           const home = (homeSlot?.winner || picks[homeSlotId]) ?? null
           const away = (awaySlot?.winner || picks[awaySlotId]) ?? null
           return { home: home as TeamCode | null, away: away as TeamCode | null }
@@ -97,15 +113,15 @@ export const useBracketStore = create<BracketState>()(
 
         if (slotId.startsWith('sf_')) {
           const position = parseInt(slotId.replace('sf_', ''))
-          const qfHomes = Object.entries(QF_TO_SF)
-            .filter(([, v]) => v.sfPosition === position && v.side === 'home')
-            .map(([k]) => `qf_${k}`)
-          const qfAways = Object.entries(QF_TO_SF)
-            .filter(([, v]) => v.sfPosition === position && v.side === 'away')
-            .map(([k]) => `qf_${k}`)
+          const qfHome = Object.entries(QF_TO_SF)
+            .find(([, v]) => v.sfPosition === position && v.side === 'home')?.[0]
+          const qfAway = Object.entries(QF_TO_SF)
+            .find(([, v]) => v.sfPosition === position && v.side === 'away')?.[0]
 
-          const homeQfId = qfHomes[0]
-          const awayQfId = qfAways[0]
+          if (!qfHome || !qfAway) return { home: null, away: null }
+
+          const homeQfId = `qf_${qfHome}`
+          const awayQfId = `qf_${qfAway}`
           const homeQf = getSlot(homeQfId)
           const awayQf = getSlot(awayQfId)
 
@@ -115,6 +131,7 @@ export const useBracketStore = create<BracketState>()(
         }
 
         if (slotId === 'final_1') {
+          // SF 1 winner vs SF 2 winner
           const sf1 = getSlot('sf_1')
           const sf2 = getSlot('sf_2')
           const home = (sf1?.winner || picks['sf_1']) ?? null

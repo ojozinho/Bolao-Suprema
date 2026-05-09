@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { AppUser } from '@/types'
 import { supabase, isMockMode } from '@/lib/supabase'
 import { MOCK_ME } from '@/data/mock'
+import { usePredictionStore } from './prediction.store'
 
 interface AuthState {
   user: AppUser | null
@@ -40,6 +41,7 @@ export const useAuthStore = create<AuthState>()(
 
       signOut: async () => {
         if (!isMockMode) await supabase.auth.signOut()
+        usePredictionStore.getState().clearAllPredictions()
         set({ user: null, isAuthenticated: false, profileComplete: false })
       },
 

@@ -503,7 +503,7 @@ export function ResenhaScreen() {
           <span className="font-display text-2xl">#RESENHA</span>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-green animate-pulse-live" />
-            <span className="font-mono text-[10px] text-ink-3">87 ONLINE</span>
+            <span className="font-mono text-[10px] text-ink-3">AO VIVO</span>
           </div>
         </div>
         <div className="flex items-center gap-3">

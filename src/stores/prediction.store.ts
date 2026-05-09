@@ -14,6 +14,8 @@ interface PredictionState {
   setDraft: (matchId: string, home: number, away: number) => void
   clearDraft: (matchId: string) => void
   confirmPrediction: (prediction: Prediction) => void
+  removePrediction: (matchId: string) => void
+  clearAllPredictions: () => void
   getPrediction: (matchId: string) => Prediction | undefined
   getDraft: (matchId: string) => { home: number; away: number } | undefined
   setChampionPick: (teamCode: string) => void
@@ -47,6 +49,16 @@ export const usePredictionStore = create<PredictionState>()(
           delete drafts[prediction.matchId]
           return { predictions, drafts }
         }),
+
+      removePrediction: (matchId) =>
+        set((s) => {
+          const predictions = { ...s.predictions }
+          delete predictions[matchId]
+          return { predictions }
+        }),
+
+      clearAllPredictions: () =>
+        set({ predictions: {}, drafts: {}, championPick: null, vicePick: null, scorerPick: null }),
 
       getPrediction: (matchId) => get().predictions[matchId],
       getDraft: (matchId) => get().drafts[matchId],

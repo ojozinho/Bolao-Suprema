@@ -33,7 +33,7 @@ interface RawMatch {
 export const WC2026_GROUPS: WCGroupDef[] = [
   { id: 'A', teams: ['MEX', 'RSA', 'KOR', 'CZE'] },
   { id: 'B', teams: ['CAN', 'SUI', 'QAT', 'BIH'] },
-  { id: 'C', teams: ['BRA', 'MAR', 'HAI', 'SCO'] },
+  { id: 'C', teams: ['BRA', 'MAR', 'HTI', 'SCO'] },
   { id: 'D', teams: ['USA', 'PAR', 'AUS', 'TUR'] },
   { id: 'E', teams: ['GER', 'CUW', 'CIV', 'ECU'] },
   { id: 'F', teams: ['NED', 'JPN', 'SWE', 'TUN'] },
@@ -75,7 +75,7 @@ const RAW: RawMatch[] = [
   // June 13 — Groups B, C
   { id: 'g-b-2', date: '2026-06-13', time: '15:00', group: 'B', md: 1, home: 'QAT', away: 'SUI', venue: "Levi's Stadium",            city: 'San Francisco',    status: 'scheduled' },
   { id: 'g-c-1', date: '2026-06-13', time: '18:00', group: 'C', md: 1, home: 'BRA', away: 'MAR', venue: 'MetLife Stadium',            city: 'Nova York',        status: 'scheduled' },
-  { id: 'g-c-2', date: '2026-06-13', time: '21:00', group: 'C', md: 1, home: 'HAI', away: 'SCO', venue: 'Gillette Stadium',           city: 'Boston',           status: 'scheduled' },
+  { id: 'g-c-2', date: '2026-06-13', time: '21:00', group: 'C', md: 1, home: 'HTI', away: 'SCO', venue: 'Gillette Stadium',           city: 'Boston',           status: 'scheduled' },
 
   // June 14 — Groups D, E, F
   { id: 'g-d-2', date: '2026-06-14', time: '12:00', group: 'D', md: 1, home: 'AUS', away: 'TUR', venue: 'BC Place',                   city: 'Vancouver',        status: 'scheduled' },
@@ -112,7 +112,7 @@ const RAW: RawMatch[] = [
   // June 19 — Groups C, D
   { id: 'g-d-3', date: '2026-06-19', time: '15:00', group: 'D', md: 2, home: 'USA', away: 'AUS', venue: 'Lumen Field',                city: 'Seattle',          status: 'scheduled' },
   { id: 'g-c-3', date: '2026-06-19', time: '18:00', group: 'C', md: 2, home: 'SCO', away: 'MAR', venue: 'Gillette Stadium',           city: 'Boston',           status: 'scheduled' },
-  { id: 'g-c-4', date: '2026-06-19', time: '20:30', group: 'C', md: 2, home: 'BRA', away: 'HAI', venue: 'Lincoln Financial Field',    city: 'Filadélfia',       status: 'scheduled' },
+  { id: 'g-c-4', date: '2026-06-19', time: '20:30', group: 'C', md: 2, home: 'BRA', away: 'HTI', venue: 'Lincoln Financial Field',    city: 'Filadélfia',       status: 'scheduled' },
   { id: 'g-d-4', date: '2026-06-19', time: '23:00', group: 'D', md: 2, home: 'TUR', away: 'PAR', venue: "Levi's Stadium",            city: 'San Francisco',    status: 'scheduled' },
 
   // June 20 — Groups E, F
@@ -144,7 +144,7 @@ const RAW: RawMatch[] = [
   { id: 'g-b-5', date: '2026-06-24', time: '15:00', group: 'B', md: 3, home: 'SUI', away: 'CAN', venue: 'BC Place',                   city: 'Vancouver',        status: 'scheduled' },
   { id: 'g-b-6', date: '2026-06-24', time: '15:00', group: 'B', md: 3, home: 'BIH', away: 'QAT', venue: 'Lumen Field',                city: 'Seattle',          status: 'scheduled' },
   { id: 'g-c-5', date: '2026-06-24', time: '18:00', group: 'C', md: 3, home: 'SCO', away: 'BRA', venue: 'Hard Rock Stadium',          city: 'Miami',            status: 'scheduled' },
-  { id: 'g-c-6', date: '2026-06-24', time: '18:00', group: 'C', md: 3, home: 'MAR', away: 'HAI', venue: 'Mercedes-Benz Stadium',      city: 'Atlanta',          status: 'scheduled' },
+  { id: 'g-c-6', date: '2026-06-24', time: '18:00', group: 'C', md: 3, home: 'MAR', away: 'HTI', venue: 'Mercedes-Benz Stadium',      city: 'Atlanta',          status: 'scheduled' },
   { id: 'g-a-5', date: '2026-06-24', time: '21:00', group: 'A', md: 3, home: 'CZE', away: 'MEX', venue: 'Estadio Azteca',             city: 'Cidade do México', status: 'scheduled' },
   { id: 'g-a-6', date: '2026-06-24', time: '21:00', group: 'A', md: 3, home: 'RSA', away: 'KOR', venue: 'Estadio BBVA',               city: 'Monterrey',        status: 'scheduled' },
 

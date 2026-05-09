@@ -19,7 +19,7 @@ export const TEAMS: Record<string, Team> = {
   // ── Grupo C ──────────────────────────────────────────────────────────────────
   BRA: { code: 'BRA', name: 'Brasil',        flag: flag('brazil'),        color: '#009C3B', group: 'C' },
   MAR: { code: 'MAR', name: 'Marrocos',      flag: flag('morocco'),       color: '#C1272D', group: 'C' },
-  HAI: { code: 'HAI', name: 'Haiti',         flag: flag('haiti'),         color: '#00209F', group: 'C' },
+  HTI: { code: 'HTI', name: 'Haiti',         flag: flag('haiti'),         color: '#00209F', group: 'C' },
   SCO: { code: 'SCO', name: 'Escócia',       flag: flag('scotland'),      color: '#003078', group: 'C' },
 
   // ── Grupo D ──────────────────────────────────────────────────────────────────

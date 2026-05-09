@@ -6,12 +6,85 @@ import { usePredictionStore } from '@/stores/prediction.store'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
 import { WC2026_MATCHES, WC2026_GROUPS } from '@/data/wc2026'
 import { TEAMS } from '@/data/teams'
-import { clamp } from '@/lib/utils'
+import { clamp, cn } from '@/lib/utils'
 import type { Match } from '@/types'
 
 type PredTab = 'groups' | 'champion'
 
 const GROUP_LABELS = ['A','B','C','D','E','F','G','H','I','J','K','L'] as const
+
+// ─── Standings engine ─────────────────────────────────────────────────────────
+
+interface StandingRow {
+  code: string
+  pts: number
+  gf: number
+  ga: number
+  gd: number
+  w: number
+  d: number
+  l: number
+  mp: number
+}
+
+function computeStandings(
+  groupCode: string,
+  predictions: Record<string, { homeScore: number; awayScore: number }>
+): StandingRow[] {
+  const groupDef = WC2026_GROUPS.find(g => g.id === groupCode)
+  if (!groupDef) return []
+
+  const rows: Record<string, StandingRow> = {}
+  for (const code of groupDef.teams) {
+    rows[code] = { code, pts: 0, gf: 0, ga: 0, gd: 0, w: 0, d: 0, l: 0, mp: 0 }
+  }
+
+  const matches = WC2026_MATCHES.filter(m => m.group === groupCode)
+
+  for (const m of matches) {
+    const pred = predictions[m.id]
+    // use real score if finished, else user prediction
+    let hg: number | null = null
+    let ag: number | null = null
+
+    if (m.status === 'finished' || m.status === 'live') {
+      hg = m.homeScore
+      ag = m.awayScore
+    } else if (pred) {
+      hg = pred.homeScore
+      ag = pred.awayScore
+    }
+
+    if (hg === null || ag === null) continue
+
+    const home = rows[m.home.code]
+    const away = rows[m.away.code]
+    if (!home || !away) continue
+
+    home.mp++
+    away.mp++
+    home.gf += hg
+    home.ga += ag
+    away.gf += ag
+    away.ga += hg
+    home.gd = home.gf - home.ga
+    away.gd = away.gf - away.ga
+
+    if (hg > ag) {
+      home.pts += 3; home.w++; away.l++
+    } else if (hg === ag) {
+      home.pts += 1; away.pts += 1; home.d++; away.d++
+    } else {
+      away.pts += 3; away.w++; home.l++
+    }
+  }
+
+  return Object.values(rows).sort((a, b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts
+    if (b.gd !== a.gd) return b.gd - a.gd
+    return b.gf - a.gf
+  })
+}
 
 // ─── Score stepper ────────────────────────────────────────────────────────────
 
@@ -34,7 +107,7 @@ function ScoreControl({ value, onChange }: { value: number; onChange: (n: number
 
 // ─── Match row (expandable inline picker) ─────────────────────────────────────
 
-function MatchRow({ match }: { match: Match }) {
+function MatchRow({ match, onScoreChange }: { match: Match; onScoreChange?: () => void }) {
   const { predictions, drafts, confirmPrediction, setDraft } = usePredictionStore()
   const existing = predictions[match.id]
   const draft = drafts[match.id]
@@ -44,9 +117,13 @@ function MatchRow({ match }: { match: Match }) {
   const [away, setAway] = useState(draft?.away ?? existing?.awayScore ?? 0)
 
   const isPickable = match.status === 'open' || match.status === 'scheduled'
+  const isLocked = match.status === 'locked'
   const isLive = match.status === 'live'
   const isDone = match.status === 'finished'
   const hasPick = !!existing
+
+  const handleHomeChange = (v: number) => { setHome(v); onScoreChange?.() }
+  const handleAwayChange = (v: number) => { setAway(v); onScoreChange?.() }
 
   const handleConfirm = () => {
     confirmPrediction({
@@ -58,11 +135,13 @@ function MatchRow({ match }: { match: Match }) {
       submittedAt: new Date().toISOString(),
     })
     setExpanded(false)
+    onScoreChange?.()
   }
 
   const handleSaveDraft = () => {
     setDraft(match.id, home, away)
     setExpanded(false)
+    onScoreChange?.()
   }
 
   const toggle = () => { if (isPickable) setExpanded(v => !v) }
@@ -72,11 +151,11 @@ function MatchRow({ match }: { match: Match }) {
       {/* ── collapsed row ── */}
       <button
         onClick={toggle}
-        className={[
+        className={cn(
           'w-full px-4 py-3 flex items-center gap-2 text-left transition-colors',
           isPickable ? 'hover:bg-hairline cursor-pointer' : 'cursor-default',
           hasPick ? 'bg-green/5' : '',
-        ].join(' ')}
+        )}
       >
         {/* home */}
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -103,7 +182,17 @@ function MatchRow({ match }: { match: Match }) {
               <span className="font-mono text-[8px] text-ink-4 ml-1">FIM</span>
             </div>
           )}
-          {!isLive && !isDone && hasPick && (
+          {(isLocked) && (
+            <span className="font-mono text-[9px] text-ink-4 flex items-center gap-1">
+              <span>🔒</span>
+              {hasPick ? (
+                <span className="text-green">{existing.homeScore}–{existing.awayScore}</span>
+              ) : (
+                <span>SEM PALPITE</span>
+              )}
+            </span>
+          )}
+          {!isLive && !isDone && !isLocked && hasPick && (
             <div className="flex items-center gap-1">
               <span className="font-display text-base leading-none text-green">{existing.homeScore}</span>
               <span className="font-mono text-[10px] text-ink-4">-</span>
@@ -111,7 +200,7 @@ function MatchRow({ match }: { match: Match }) {
               <span className="font-mono text-[9px] text-green ml-0.5">✓</span>
             </div>
           )}
-          {!isLive && !isDone && !hasPick && (
+          {!isLive && !isDone && !isLocked && !hasPick && (
             <span className="font-mono text-[9px] text-ink-3 whitespace-nowrap">
               {match.date.split(' ').slice(1).join(' ')} · {match.time}
             </span>
@@ -143,18 +232,19 @@ function MatchRow({ match }: { match: Match }) {
             className="overflow-hidden"
           >
             <div className="px-4 py-5 bg-paper-deep border-t border-hairline">
-              <p className="font-mono text-[9px] tracking-eyebrow text-ink-3 mb-4 text-center">
-                {match.venue}
+              <p className="font-mono text-[9px] tracking-eyebrow text-ink-3 mb-1 text-center">
+                PALPITE · PLACAR EXATO
               </p>
+              <p className="font-mono text-[8px] text-ink-4 mb-4 text-center">{match.venue}</p>
               <div className="flex items-center justify-center gap-5">
                 <div className="flex flex-col items-center gap-2 min-w-0">
                   <Flag team={match.home} size={40} />
                   <span className="font-mono text-[10px] font-bold">{match.home.name.split(' ')[0].toUpperCase()}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <ScoreControl value={home} onChange={setHome} />
+                  <ScoreControl value={home} onChange={handleHomeChange} />
                   <span className="font-serif-it text-2xl text-ink-3">×</span>
-                  <ScoreControl value={away} onChange={setAway} />
+                  <ScoreControl value={away} onChange={handleAwayChange} />
                 </div>
                 <div className="flex flex-col items-center gap-2 min-w-0">
                   <Flag team={match.away} size={40} />
@@ -177,11 +267,102 @@ function MatchRow({ match }: { match: Match }) {
   )
 }
 
+// ─── Mini-standings table (quem passa?) ───────────────────────────────────────
+
+function MiniStandings({ standings, totalMatches, filledMatches }: {
+  standings: StandingRow[]
+  totalMatches: number
+  filledMatches: number
+}) {
+  if (filledMatches === 0) return null
+
+  const classified = standings.slice(0, 2)
+  const eliminated = standings.slice(2)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="mx-4 mb-4 border-2 border-ink overflow-hidden"
+    >
+      {/* Header */}
+      <div className="px-3 py-2 bg-ink flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[9px] tracking-eyebrow text-paper/70">QUEM PASSA?</span>
+          <span className="font-mono text-[8px] text-yellow font-bold">
+            {filledMatches === totalMatches ? 'GRUPO COMPLETO' : `${filledMatches}/${totalMatches} jogos`}
+          </span>
+        </div>
+        <span className="font-mono text-[8px] text-paper/40">baseado nos seus palpites</span>
+      </div>
+
+      {/* Table header */}
+      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-0 px-3 py-1.5 border-b border-hairline bg-paper-deep">
+        <span className="font-mono text-[8px] text-ink-4">SELEÇÃO</span>
+        <span className="font-mono text-[8px] text-ink-4 w-6 text-center">PTS</span>
+        <span className="font-mono text-[8px] text-ink-4 w-6 text-center">GF</span>
+        <span className="font-mono text-[8px] text-ink-4 w-6 text-center">GC</span>
+        <span className="font-mono text-[8px] text-ink-4 w-8 text-center">SG</span>
+      </div>
+
+      {/* Classified */}
+      {classified.map((row, i) => (
+        <div
+          key={row.code}
+          className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-0 px-3 py-2 border-b border-hairline bg-green/5 items-center"
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[9px] text-green font-bold">{i + 1}°</span>
+            <Flag team={TEAMS[row.code]} size={16} />
+            <span className="font-mono text-[10px] font-bold">{row.code}</span>
+            <span className="font-mono text-[7px] text-green font-bold bg-green/10 px-1 py-0.5">PASSA</span>
+          </div>
+          <span className="font-display text-sm text-ink w-6 text-center">{row.pts}</span>
+          <span className="font-mono text-[9px] text-ink-3 w-6 text-center">{row.gf}</span>
+          <span className="font-mono text-[9px] text-ink-3 w-6 text-center">{row.ga}</span>
+          <span className={cn('font-mono text-[9px] w-8 text-center', row.gd > 0 ? 'text-green' : row.gd < 0 ? 'text-red' : 'text-ink-4')}>
+            {row.gd > 0 ? `+${row.gd}` : row.gd}
+          </span>
+        </div>
+      ))}
+
+      {/* Separator */}
+      <div className="px-3 py-1 bg-hairline flex items-center gap-2">
+        <div className="flex-1 h-px bg-ink-4/30" />
+        <span className="font-mono text-[7px] text-ink-4 tracking-eyebrow">ELIMINADOS</span>
+        <div className="flex-1 h-px bg-ink-4/30" />
+      </div>
+
+      {/* Eliminated */}
+      {eliminated.map((row, i) => (
+        <div
+          key={row.code}
+          className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-0 px-3 py-2 border-b border-hairline last:border-0 opacity-50 items-center"
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[9px] text-ink-4">{i + 3}°</span>
+            <Flag team={TEAMS[row.code]} size={16} />
+            <span className="font-mono text-[10px]">{row.code}</span>
+          </div>
+          <span className="font-display text-sm text-ink-3 w-6 text-center">{row.pts}</span>
+          <span className="font-mono text-[9px] text-ink-3 w-6 text-center">{row.gf}</span>
+          <span className="font-mono text-[9px] text-ink-3 w-6 text-center">{row.ga}</span>
+          <span className="font-mono text-[9px] text-ink-3 w-8 text-center">
+            {row.gd > 0 ? `+${row.gd}` : row.gd}
+          </span>
+        </div>
+      ))}
+    </motion.div>
+  )
+}
+
 // ─── Groups tab ───────────────────────────────────────────────────────────────
 
 function GroupsTab() {
-  const [selectedGroup, setSelectedGroup] = useState<string>('C')
+  const [selectedGroup, setSelectedGroup] = useState<string>('A')
   const { predictions } = usePredictionStore()
+  const [tick, setTick] = useState(0) // force standings recompute on score change
 
   const countPerGroup = useMemo(() => {
     const map: Record<string, number> = {}
@@ -189,7 +370,7 @@ function GroupsTab() {
       map[g] = WC2026_MATCHES.filter(m => m.group === g && predictions[m.id]).length
     }
     return map
-  }, [predictions])
+  }, [predictions, tick])
 
   const groupMatches = useMemo(
     () => WC2026_MATCHES.filter(m => m.group === selectedGroup),
@@ -209,6 +390,22 @@ function GroupsTab() {
   }, [groupMatches])
 
   const groupDef = WC2026_GROUPS.find(g => g.id === selectedGroup)
+
+  // Build standings from predictions (including drafts via onScoreChange)
+  const standings = useMemo(() => {
+    const predMap: Record<string, { homeScore: number; awayScore: number }> = {}
+    for (const [matchId, pred] of Object.entries(predictions)) {
+      predMap[matchId] = { homeScore: pred.homeScore, awayScore: pred.awayScore }
+    }
+    return computeStandings(selectedGroup, predMap)
+  }, [selectedGroup, predictions, tick])
+
+  const filledMatches = groupMatches.filter(m => {
+    if (m.status === 'finished' || m.status === 'live') return true
+    return !!predictions[m.id]
+  }).length
+
+  const handleScoreChange = useCallback(() => setTick(t => t + 1), [])
 
   return (
     <div className="pb-24">
@@ -265,14 +462,16 @@ function GroupsTab() {
                 RODADA {md}
               </span>
             </div>
-            {matches.map(m => <MatchRow key={m.id} match={m} />)}
+            {matches.map(m => (
+              <MatchRow key={m.id} match={m} onScoreChange={handleScoreChange} />
+            ))}
           </div>
         )
       })}
 
       {/* Progress bar */}
       {doneInGroup > 0 && (
-        <div className="mx-4 mt-4">
+        <div className="mx-4 mt-4 mb-4">
           <div className="h-1 bg-hairline overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
@@ -285,6 +484,29 @@ function GroupsTab() {
             {doneInGroup} de {totalInGroup} jogos do Grupo {selectedGroup} palpitados
           </p>
         </div>
+      )}
+
+      {/* Mini standings preview */}
+      <MiniStandings
+        standings={standings}
+        totalMatches={totalInGroup}
+        filledMatches={filledMatches}
+      />
+
+      {/* CTA to see bracket */}
+      {doneInGroup === totalInGroup && standings.length >= 2 && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mx-4 mb-4 p-3 border-2 border-yellow bg-yellow/10 flex items-center gap-3"
+        >
+          <div>
+            <p className="font-mono text-[9px] tracking-eyebrow text-ink-3">GRUPO COMPLETO</p>
+            <p className="font-display text-base leading-none">
+              {standings[0]?.code} e {standings[1]?.code} avançam no seu palpite
+            </p>
+          </div>
+        </motion.div>
       )}
     </div>
   )
@@ -345,12 +567,19 @@ function TeamPickerGrid({
 
 // ─── Champion tab (campeão + vice + artilheiro) ───────────────────────────────
 
+// Deadline for general bets: 2026-06-11T15:00:00 (first match kickoff)
+const GENERAL_DEADLINE = new Date('2026-06-11T15:00:00')
+
 function ChampionTab() {
   const { championPick, vicePick, scorerPick, setChampionPick, setVicePick, setScorerPick } = usePredictionStore()
   const [scorerInput, setScorerInput] = useState(scorerPick ?? '')
   const [section, setSection] = useState<'champion' | 'vice' | 'scorer'>('champion')
 
+  const now = new Date()
+  const isDeadlinePassed = now >= GENERAL_DEADLINE
   const allSet = championPick && vicePick && scorerPick
+
+  const deadlineStr = '11 Jun · 15:00'
 
   return (
     <div className="px-4 py-6 pb-24">
@@ -360,9 +589,14 @@ function ChampionTab() {
         <div className="font-serif-it text-xl text-green-deep leading-snug mt-0.5">
           obrigatórias antes da primeira partida
         </div>
-        <p className="font-mono text-[10px] text-ink-3 mt-1.5">
-          Prazo: antes de 11 Jun · 15:00 (início da Copa)
-        </p>
+        <div className={cn(
+          'mt-2 inline-flex items-center gap-2 px-3 py-1.5 border font-mono text-[10px]',
+          isDeadlinePassed
+            ? 'border-red/40 bg-red/5 text-red'
+            : 'border-yellow/40 bg-yellow/5 text-ink-3'
+        )}>
+          {isDeadlinePassed ? '🔒 ENCERRADO' : '⏳ PRAZO:'} {deadlineStr}
+        </div>
       </div>
 
       {/* Progress */}
@@ -374,11 +608,13 @@ function ChampionTab() {
         ].map(s => (
           <button
             key={s.id}
-            onClick={() => setSection(s.id)}
+            onClick={() => !isDeadlinePassed && setSection(s.id)}
+            disabled={isDeadlinePassed && !s.done}
             className={[
               'flex-1 py-2.5 border-2 transition-colors',
               section === s.id ? 'border-ink bg-ink text-paper' :
               s.done ? 'border-green bg-green/5' : 'border-hairline hover:border-ink',
+              isDeadlinePassed ? 'opacity-60 cursor-default' : '',
             ].join(' ')}
           >
             <div className="font-mono text-[8px] tracking-eyebrow">{s.label}</div>
@@ -388,16 +624,22 @@ function ChampionTab() {
         ))}
       </div>
 
+      {isDeadlinePassed && (
+        <div className="mb-5 p-3 border border-red/30 bg-red/5">
+          <p className="font-mono text-[10px] text-red">
+            Apostas gerais encerradas. As apostas travaram no início da competição.
+          </p>
+        </div>
+      )}
+
       {/* Section content */}
-      {section === 'champion' && (
+      {!isDeadlinePassed && section === 'champion' && (
         <TeamPickerGrid label="CAMPEÃO" pts={25} pick={championPick} onPick={setChampionPick} />
       )}
-
-      {section === 'vice' && (
+      {!isDeadlinePassed && section === 'vice' && (
         <TeamPickerGrid label="VICE-CAMPEÃO" pts={15} pick={vicePick} onPick={setVicePick} />
       )}
-
-      {section === 'scorer' && (
+      {!isDeadlinePassed && section === 'scorer' && (
         <div>
           <div className="flex items-baseline gap-2 mb-3">
             <span className="font-display text-2xl leading-none">ARTILHEIRO</span>
@@ -433,8 +675,44 @@ function ChampionTab() {
         </div>
       )}
 
+      {/* Show locked picks when deadline passed */}
+      {isDeadlinePassed && (
+        <div className="space-y-3">
+          {championPick && (
+            <div className="flex items-center gap-3 p-3 border border-hairline">
+              <Flag team={TEAMS[championPick]} size={32} />
+              <div>
+                <p className="font-mono text-[8px] tracking-eyebrow text-ink-4">CAMPEÃO</p>
+                <p className="font-display text-lg">{TEAMS[championPick]?.name.toUpperCase()}</p>
+              </div>
+              <span className="ml-auto font-mono text-[9px] text-green">✓ +25pts</span>
+            </div>
+          )}
+          {vicePick && (
+            <div className="flex items-center gap-3 p-3 border border-hairline">
+              <Flag team={TEAMS[vicePick]} size={32} />
+              <div>
+                <p className="font-mono text-[8px] tracking-eyebrow text-ink-4">VICE</p>
+                <p className="font-display text-lg">{TEAMS[vicePick]?.name.toUpperCase()}</p>
+              </div>
+              <span className="ml-auto font-mono text-[9px] text-green">✓ +15pts</span>
+            </div>
+          )}
+          {scorerPick && (
+            <div className="flex items-center gap-3 p-3 border border-hairline">
+              <div className="w-8 h-8 flex items-center justify-center border-2 border-hairline font-display text-lg">⚽</div>
+              <div>
+                <p className="font-mono text-[8px] tracking-eyebrow text-ink-4">ARTILHEIRO</p>
+                <p className="font-display text-lg">{scorerPick.toUpperCase()}</p>
+              </div>
+              <span className="ml-auto font-mono text-[9px] text-green">✓ +10pts</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* All done banner */}
-      {allSet && (
+      {allSet && !isDeadlinePassed && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -451,6 +729,83 @@ function ChampionTab() {
 }
 
 // ─── Desktop sidebar list ─────────────────────────────────────────────────────
+
+function DesktopGroupView({
+  selectedGroup,
+  predictions,
+}: {
+  selectedGroup: string
+  predictions: Record<string, { homeScore: number; awayScore: number }>
+}) {
+  const [tick, setTick] = useState(0)
+  const handleScoreChange = useCallback(() => setTick(t => t + 1), [])
+
+  const groupMatches = useMemo(
+    () => WC2026_MATCHES.filter(m => m.group === selectedGroup),
+    [selectedGroup]
+  )
+
+  const standings = useMemo(
+    () => computeStandings(selectedGroup, predictions),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedGroup, predictions, tick]
+  )
+
+  const filledMatches = groupMatches.filter(m => {
+    if (m.status === 'finished' || m.status === 'live') return true
+    return !!predictions[m.id]
+  }).length
+
+  const countPerGroup = useMemo(() => {
+    return WC2026_MATCHES.filter(m => m.group === selectedGroup && predictions[m.id]).length
+  }, [selectedGroup, predictions, tick])
+
+  return (
+    <div className="border-2 border-ink flex flex-col">
+      {/* Desktop group header */}
+      <div className="px-5 py-4 border-b border-hairline flex items-center gap-3">
+        <span className="font-display text-xl">GRUPO {selectedGroup}</span>
+        <div className="flex gap-1">
+          {WC2026_GROUPS.find(g => g.id === selectedGroup)?.teams.map(code => (
+            <Flag key={code} team={TEAMS[code]} size={20} />
+          ))}
+        </div>
+        <span className="ml-auto font-mono text-[10px] text-ink-3">
+          {countPerGroup}/6 palpites
+        </span>
+      </div>
+
+      {/* Matchdays */}
+      {[1, 2, 3].map(md => {
+        const matches = WC2026_MATCHES.filter(
+          m => m.group === selectedGroup && m.stageLabel.endsWith(`MD${md}`)
+        )
+        if (!matches.length) return null
+        return (
+          <div key={md}>
+            <div className="px-5 py-2.5 border-b border-hairline bg-paper-deep">
+              <span className="font-mono text-[9px] tracking-eyebrow text-ink-3">RODADA {md}</span>
+            </div>
+            {matches.map(m => (
+              <MatchRow key={m.id} match={m} onScoreChange={handleScoreChange} />
+            ))}
+          </div>
+        )
+      })}
+
+      {/* Standings */}
+      {filledMatches > 0 && (
+        <div className="border-t-2 border-ink">
+          <MiniStandings
+            standings={standings}
+            totalMatches={groupMatches.length}
+            filledMatches={filledMatches}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
 
 function DesktopGroupSidebar({
   selectedGroup,
@@ -502,10 +857,18 @@ function DesktopGroupSidebar({
 
 export function PredictionScreen() {
   const [tab, setTab] = useState<PredTab>('groups')
-  const [selectedGroup, setSelectedGroup] = useState('C')
+  const [selectedGroup, setSelectedGroup] = useState('A')
   const { predictions } = usePredictionStore()
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
+
+  const predMap = useMemo(() => {
+    const m: Record<string, { homeScore: number; awayScore: number }> = {}
+    for (const [matchId, pred] of Object.entries(predictions)) {
+      m[matchId] = { homeScore: pred.homeScore, awayScore: pred.awayScore }
+    }
+    return m
+  }, [predictions])
 
   const countPerGroup = useMemo(() => {
     const map: Record<string, number> = {}
@@ -520,7 +883,7 @@ export function PredictionScreen() {
 
   const tabs = [
     { id: 'groups' as const, label: 'GRUPOS' },
-    { id: 'champion' as const, label: 'CAMPEÃO' },
+    { id: 'champion' as const, label: 'APOSTAS GERAIS' },
   ]
 
   return (
@@ -542,7 +905,7 @@ export function PredictionScreen() {
               onClick={() => navigate('/bracket')}
               className="mt-2 font-mono text-[10px] font-bold text-ink-3 hover:text-ink border border-hairline hover:border-ink px-3 py-1.5 transition-colors"
             >
-              MATA-MATA ↗
+              MINHA CHAVE ↗
             </button>
           </div>
         </div>
@@ -564,9 +927,9 @@ export function PredictionScreen() {
         ))}
         <button
           onClick={() => navigate('/bracket')}
-          className="flex-1 py-3 font-mono text-[11px] font-bold tracking-eyebrow border-b-2 border-transparent text-ink-3 hover:text-ink transition-colors md:hidden"
+          className="px-4 py-3 font-mono text-[11px] font-bold tracking-eyebrow border-b-2 border-transparent text-ink-3 hover:text-ink transition-colors md:hidden whitespace-nowrap"
         >
-          MATA-MATA ↗
+          MINHA CHAVE ↗
         </button>
       </div>
 
@@ -587,35 +950,10 @@ export function PredictionScreen() {
                   onSelect={setSelectedGroup}
                   countPerGroup={countPerGroup}
                 />
-                <div className="border-2 border-ink">
-                  {/* Desktop group header */}
-                  <div className="px-5 py-4 border-b border-hairline flex items-center gap-3">
-                    <span className="font-display text-xl">GRUPO {selectedGroup}</span>
-                    <div className="flex gap-1">
-                      {WC2026_GROUPS.find(g => g.id === selectedGroup)?.teams.map(code => (
-                        <Flag key={code} team={TEAMS[code]} size={20} />
-                      ))}
-                    </div>
-                    <span className="ml-auto font-mono text-[10px] text-ink-3">
-                      {countPerGroup[selectedGroup] ?? 0}/6 palpites
-                    </span>
-                  </div>
-                  {/* Matchdays */}
-                  {[1, 2, 3].map(md => {
-                    const matches = WC2026_MATCHES.filter(
-                      m => m.group === selectedGroup && m.stageLabel.endsWith(`MD${md}`)
-                    )
-                    if (!matches.length) return null
-                    return (
-                      <div key={md}>
-                        <div className="px-5 py-2.5 border-b border-hairline bg-paper-deep">
-                          <span className="font-mono text-[9px] tracking-eyebrow text-ink-3">RODADA {md}</span>
-                        </div>
-                        {matches.map(m => <MatchRow key={m.id} match={m} />)}
-                      </div>
-                    )
-                  })}
-                </div>
+                <DesktopGroupView
+                  selectedGroup={selectedGroup}
+                  predictions={predMap}
+                />
               </div>
             ) : (
               <GroupsTab />
