@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { createHashRouter, RouterProvider, Navigate, Outlet, useLocation } from 'react-router-dom'
+import { createHashRouter, RouterProvider, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuthStore } from '@/stores/auth.store'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
@@ -15,6 +15,25 @@ import { RankingScreen } from '@/screens/Ranking'
 import { ResenhaScreen } from '@/screens/Resenha'
 import { AdminScreen } from '@/screens/Admin'
 import { BoletimScreen } from '@/screens/Boletim'
+
+// ─── Root redirect — onboarding for first visit ───────────────────────────────
+
+function RootRedirect() {
+  const { isAuthenticated, isLoading } = useAuthStore()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (isLoading) return
+    if (isAuthenticated) {
+      navigate('/home', { replace: true })
+    } else {
+      const visited = localStorage.getItem('bolao-visited')
+      navigate(visited ? '/login' : '/onboarding', { replace: true })
+    }
+  }, [isAuthenticated, isLoading, navigate])
+
+  return null
+}
 
 // ─── Auth Guard ───────────────────────────────────────────────────────────────
 
@@ -74,7 +93,7 @@ function AnimatedOutlet() {
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 const router = createHashRouter([
-  { path: '/', element: <Navigate to="/home" replace /> },
+  { path: '/', element: <RootRedirect /> },
   { path: '/onboarding', element: <OnboardingScreen /> },
   { path: '/login', element: <LoginScreen /> },
 

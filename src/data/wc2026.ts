@@ -96,7 +96,7 @@ const RAW: RawMatch[] = [
   { id: 'g-j-1', date: '2026-06-16', time: '21:00', group: 'J', md: 1, home: 'ARG', away: 'ALG', venue: 'Arrowhead Stadium',          city: 'Kansas City',      status: 'scheduled' },
 
   // June 17 — Groups J, K, L
-  { id: 'g-j-2', date: '2026-06-17', time: '00:00', group: 'J', md: 1, home: 'AUT', away: 'JOR', venue: "Levi's Stadium",            city: 'San Francisco',    status: 'scheduled' },
+  { id: 'g-j-2', date: '2026-06-17', time: '10:00', group: 'J', md: 1, home: 'AUT', away: 'JOR', venue: "Levi's Stadium",            city: 'San Francisco',    status: 'scheduled' },
   { id: 'g-k-1', date: '2026-06-17', time: '13:00', group: 'K', md: 1, home: 'POR', away: 'COD', venue: 'NRG Stadium',                city: 'Houston',          status: 'scheduled' },
   { id: 'g-l-1', date: '2026-06-17', time: '16:00', group: 'L', md: 1, home: 'ENG', away: 'CRO', venue: 'AT&T Stadium',               city: 'Dallas',           status: 'scheduled' },
   { id: 'g-l-2', date: '2026-06-17', time: '19:00', group: 'L', md: 1, home: 'GHA', away: 'PAN', venue: 'BMO Field',                  city: 'Toronto',          status: 'scheduled' },
@@ -119,7 +119,7 @@ const RAW: RawMatch[] = [
   { id: 'g-f-3', date: '2026-06-20', time: '13:00', group: 'F', md: 2, home: 'NED', away: 'SWE', venue: 'NRG Stadium',                city: 'Houston',          status: 'scheduled' },
   { id: 'g-e-3', date: '2026-06-20', time: '16:00', group: 'E', md: 2, home: 'GER', away: 'CIV', venue: 'BMO Field',                  city: 'Toronto',          status: 'scheduled' },
   { id: 'g-e-4', date: '2026-06-20', time: '20:00', group: 'E', md: 2, home: 'ECU', away: 'CUW', venue: 'Arrowhead Stadium',          city: 'Kansas City',      status: 'scheduled' },
-  { id: 'g-f-4', date: '2026-06-20', time: '00:00', group: 'F', md: 2, home: 'TUN', away: 'JPN', venue: 'Estadio BBVA',               city: 'Monterrey',        status: 'scheduled' },
+  { id: 'g-f-4', date: '2026-06-20', time: '23:00', group: 'F', md: 2, home: 'TUN', away: 'JPN', venue: 'Estadio BBVA',               city: 'Monterrey',        status: 'scheduled' },
 
   // June 21 — Groups G, H
   { id: 'g-h-3', date: '2026-06-21', time: '12:00', group: 'H', md: 2, home: 'ESP', away: 'KSA', venue: 'Mercedes-Benz Stadium',      city: 'Atlanta',          status: 'scheduled' },

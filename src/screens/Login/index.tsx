@@ -23,6 +23,7 @@ function useLoginForm() {
   const fullEmail = email.includes('@suprema') ? email : `${email}suprema.group`
 
   const handleSubmit = async () => {
+    if (!email.trim()) return
     setLoading(true)
     setError('')
     const result = await signInWithEmail(fullEmail)
@@ -31,8 +32,11 @@ function useLoginForm() {
       setError(result.error)
     } else {
       setSent(true)
-      // Mock: redirect immediately
-      setTimeout(() => navigate('/profile'), 800)
+      // Mock mode: redirect immediately after state is set via signInWithEmail
+      // Real mode: user clicks magic link in email → onAuthStateChange handles redirect
+      if (import.meta.env.VITE_MOCK_MODE !== 'false') {
+        setTimeout(() => navigate('/home'), 600)
+      }
     }
   }
 
@@ -101,7 +105,7 @@ function LoginMobile() {
             className="text-center py-6"
           >
             <p className="font-display text-3xl text-yellow mb-2">LINK ENVIADO!</p>
-            <p className="font-mono text-[12px] text-paper/60">Redirecionando…</p>
+            <p className="font-mono text-[12px] text-paper/60">Cheque seu e-mail e clique no link de acesso.</p>
           </motion.div>
         )}
 
@@ -196,7 +200,7 @@ function LoginDesktop() {
             className="text-center py-8"
           >
             <p className="font-display text-4xl text-green mb-2">LINK ENVIADO!</p>
-            <p className="font-mono text-[12px] text-ink-3">Redirecionando…</p>
+            <p className="font-mono text-[12px] text-ink-3">Cheque seu e-mail e clique no link de acesso.</p>
           </motion.div>
         )}
       </div>

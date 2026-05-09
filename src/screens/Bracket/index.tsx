@@ -18,6 +18,7 @@ const ROUNDS: { id: BracketRound; label: string; shortLabel: string }[] = [
   { id: 'r16',   label: 'OITAVAS DE FINAL', shortLabel: 'OITAVAS' },
   { id: 'qf',    label: 'QUARTAS DE FINAL', shortLabel: 'QUARTAS' },
   { id: 'sf',    label: 'SEMIFINAIS',        shortLabel: 'SEMI'    },
+  { id: 'third', label: '3° LUGAR',          shortLabel: '3° LUG'  },
   { id: 'final', label: 'FINAL',             shortLabel: 'FINAL'   },
 ]
 
@@ -496,7 +497,7 @@ function BracketMobile() {
       </div>
 
       {/* ── Round selector ── */}
-      <div className="sticky top-0 z-10 bg-paper border-b border-hairline grid grid-cols-4">
+      <div className="sticky top-0 z-10 bg-paper border-b border-hairline grid grid-cols-5">
         {ROUNDS.map(r => (
           <button
             key={r.id}
@@ -611,6 +612,7 @@ function BracketDesktop() {
   const r16   = allSlots.filter(s => s.round === 'r16')
   const qf    = allSlots.filter(s => s.round === 'qf')
   const sf    = allSlots.filter(s => s.round === 'sf')
+  const third = allSlots.filter(s => s.round === 'third')
   const final = allSlots.filter(s => s.round === 'final')
 
   const resolveMySlot = (slot: BracketSlot) => {
@@ -633,10 +635,10 @@ function BracketDesktop() {
   // Split r16 into two halves for left/right bracket display
   const r16Left  = r16.slice(0, 8)
   const r16Right = r16.slice(8)
-  const qfLeft   = qf.slice(0, 2)
-  const qfRight  = qf.slice(2)
-  const sfLeft   = sf.slice(0, 1)
-  const sfRight  = sf.slice(1)
+  const qfLeft   = qf.slice(0, 4)  // qf_1..qf_4 → feed sf_1, sf_2
+  const qfRight  = qf.slice(4)     // qf_5..qf_8 → feed sf_3, sf_4
+  const sfLeft   = sf.slice(0, 2)  // sf_1, sf_2 → feed FINAL
+  const sfRight  = sf.slice(2)     // sf_3, sf_4 → feed 3° LUGAR
 
   const renderMyColumn = (slots: BracketSlot[], compact = true) =>
     slots.map(slot => {
@@ -758,7 +760,7 @@ function BracketDesktop() {
               </div>
             </div>
 
-            {/* CENTER: Final + Champion */}
+            {/* CENTER: Final + 3° Lugar + Champion */}
             <div className="flex-shrink-0 flex flex-col items-center gap-4 mt-36">
               <p className="font-mono text-[9px] tracking-eyebrow text-ink-3">FINAL</p>
               {view === 'mine' ? (
@@ -800,6 +802,36 @@ function BracketDesktop() {
                   </div>
                   <span className="font-display text-4xl ml-auto">🏆</span>
                 </motion.div>
+              )}
+
+              {/* 3° Lugar */}
+              {third.length > 0 && (
+                <div className="mt-4 w-full">
+                  <p className="font-mono text-[9px] tracking-eyebrow text-ink-3 mb-2 text-center">3° LUGAR</p>
+                  {view === 'mine' ? (
+                    third.map(slot => {
+                      const { home, away } = resolveMySlot(slot)
+                      return (
+                        <MySlotCard
+                          key={slot.slotId}
+                          slotId={slot.slotId}
+                          label="3° LUGAR"
+                          home={home}
+                          away={away}
+                          myPick={picks[slot.slotId]}
+                          realWinner={slot.winner}
+                          onPick={setPick}
+                          isLocked={isRoundLocked('third')}
+                          compact={false}
+                        />
+                      )
+                    })
+                  ) : (
+                    third.map(slot => (
+                      <LiveSlotCard key={slot.slotId} slot={slot} compact={false} />
+                    ))
+                  )}
+                </div>
               )}
             </div>
 

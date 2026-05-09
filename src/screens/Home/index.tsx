@@ -8,12 +8,12 @@ import { MOCK_UPCOMING } from '@/data/mock'
 import { WC2026_MATCHES } from '@/data/wc2026'
 import { asset, cn } from '@/lib/utils'
 
-const TOURNAMENT_START = new Date('2026-06-11T15:00:00')
+const TOURNAMENT_START = new Date('2026-06-11T18:00:00Z')
 
 const MARQUEE_ITEMS = [
   'COPA DO MUNDO 2026',
   'USA · CAN · MEX',
-  '48 SELEÇÕES · 104 PARTIDAS',
+  '48 SELEÇÕES · 102 PARTIDAS',
   'FASE DE GRUPOS · 11 JUN',
   'OITAVAS · 27 JUN',
   'QUARTAS · 4 JUL',

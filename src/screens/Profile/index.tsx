@@ -238,7 +238,7 @@ function ProfileMobile() {
           championPick={form.championPick}
           vicePick={form.vicePick}
           scorerPick={form.scorerPick}
-          onEdit={() => navigate('/prediction')}
+          onEdit={() => navigate('/prediction', { state: { tab: 'champion' } })}
         />
 
         {/* Save */}
@@ -353,7 +353,7 @@ function ProfileDesktop() {
               championPick={form.championPick}
               vicePick={form.vicePick}
               scorerPick={form.scorerPick}
-              onEdit={() => navigate('/prediction')}
+              onEdit={() => navigate('/prediction', { state: { tab: 'champion' } })}
             />
 
             <div className="flex gap-3">

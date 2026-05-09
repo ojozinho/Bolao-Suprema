@@ -33,7 +33,7 @@ export const MOCK_RANKING: RankingEntry[] = []
 // ─── Bracket ─────────────────────────────────────────────────────────────────
 // R16 slots labelled by group advancement (TBD until groups complete)
 
-// WC2026: 12 groups → 32 qualifiers → 16 R16 matches → 8 QF → 4 SF → 2 SF → Final
+// WC2026: 12 groups → 32 qualifiers → 16 R16 → 8 QF → 4 SF → 1 Third place + 1 Final
 export const MOCK_BRACKET_SLOTS: BracketSlot[] = [
   // ── Oitavas de Final (16 jogos) ──────────────────────────────────────────────
   { slotId: 'r16_1',   round: 'r16',   position: 1,  matchId: null, homeTeam: null, awayTeam: null, homeScore: null, awayScore: null, status: 'wait', winner: null },
@@ -66,6 +66,8 @@ export const MOCK_BRACKET_SLOTS: BracketSlot[] = [
   { slotId: 'sf_2',    round: 'sf',    position: 2,  matchId: null, homeTeam: null, awayTeam: null, homeScore: null, awayScore: null, status: 'wait', winner: null },
   { slotId: 'sf_3',    round: 'sf',    position: 3,  matchId: null, homeTeam: null, awayTeam: null, homeScore: null, awayScore: null, status: 'wait', winner: null },
   { slotId: 'sf_4',    round: 'sf',    position: 4,  matchId: null, homeTeam: null, awayTeam: null, homeScore: null, awayScore: null, status: 'wait', winner: null },
-  // ── Final ────────────────────────────────────────────────────────────────────
+  // ── 3° Lugar (sf_3 winner vs sf_4 winner) ────────────────────────────────────
+  { slotId: 'third_1', round: 'third', position: 1,  matchId: null, homeTeam: null, awayTeam: null, homeScore: null, awayScore: null, status: 'wait', winner: null },
+  // ── Final (sf_1 winner vs sf_2 winner) ───────────────────────────────────────
   { slotId: 'final_1', round: 'final', position: 1,  matchId: null, homeTeam: null, awayTeam: null, homeScore: null, awayScore: null, status: 'wait', winner: null },
 ]

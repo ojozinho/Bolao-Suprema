@@ -33,10 +33,13 @@ export const useAuthStore = create<AuthState>()(
           profileComplete: !!(user?.firstName && user?.dept),
         }),
 
-      signInWithEmail: async (_email: string) => {
-        // TODO: remove bypass and restore OTP when enabling real auth
-        set({ user: MOCK_ME, isAuthenticated: true, profileComplete: true })
-        return {}
+      signInWithEmail: async (email: string) => {
+        if (isMockMode) {
+          set({ user: MOCK_ME, isAuthenticated: true, profileComplete: true })
+          return {}
+        }
+        const { error } = await supabase.auth.signInWithOtp({ email })
+        return error ? { error: error.message } : {}
       },
 
       signOut: async () => {
@@ -47,9 +50,13 @@ export const useAuthStore = create<AuthState>()(
 
       loadSession: async () => {
         if (isMockMode) {
-          // In mock mode, restore persisted user or stay logged out
           const stored = get().user
-          set({ user: stored, isAuthenticated: !!stored, isLoading: false })
+          set({
+            user: stored,
+            isAuthenticated: !!stored,
+            profileComplete: !!(stored?.firstName && stored?.dept),
+            isLoading: false,
+          })
           return
         }
         const { data } = await supabase.auth.getSession()

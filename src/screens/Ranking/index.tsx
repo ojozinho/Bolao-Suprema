@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Avatar } from '@/components/shared/Avatar'
 import { Eyebrow } from '@/components/shared/Eyebrow'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
+import { useAuthStore } from '@/stores/auth.store'
 import { MOCK_RANKING } from '@/data/mock'
 import { fmtPts, cn } from '@/lib/utils'
 import type { RankingEntry } from '@/types'
@@ -66,9 +67,15 @@ function EmptyRanking() {
 
 function RankingMobile() {
   const [tab, setTab] = useState<'geral' | 'squad' | 'semana'>('geral')
-  const ranking = MOCK_RANKING
-  const top3 = ranking.slice(0, 3)
-  const me = ranking.find(r => r.isYou)
+  const me = useAuthStore(s => s.user)
+  const fullRanking = MOCK_RANKING
+  const myEntry = fullRanking.find(r => r.isYou)
+
+  const ranking = tab === 'squad' && me
+    ? fullRanking.filter(r => r.dept === me.dept)
+    : fullRanking
+
+  const top3 = fullRanking.slice(0, 3)
 
   return (
     <div className="min-h-dvh bg-paper pb-20">
@@ -102,16 +109,16 @@ function RankingMobile() {
         )}
       </div>
 
-      {me && (
+      {myEntry && (
         <div className="bg-ink text-paper px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
-          <Avatar initials={me.initials} color={me.color} size={32} />
+          <Avatar initials={myEntry.initials} color={myEntry.color} size={32} />
           <div className="flex-1">
-            <div className="font-mono text-[10px] text-paper/50">VOCÊ · {me.rank}º</div>
-            <div className="font-display text-2xl">{fmtPts(me.pts)} PTS</div>
+            <div className="font-mono text-[10px] text-paper/50">VOCÊ · {myEntry.rank}º</div>
+            <div className="font-display text-2xl">{fmtPts(myEntry.pts)} PTS</div>
           </div>
           <div className="text-right">
-            <div className="font-mono text-[10px] text-paper/50">{me.correct} acertos</div>
-            <div className="font-mono text-[10px] text-yellow">{me.streak}🔥 streak</div>
+            <div className="font-mono text-[10px] text-paper/50">{myEntry.correct} acertos</div>
+            <div className="font-mono text-[10px] text-yellow">{myEntry.streak}🔥 streak</div>
           </div>
         </div>
       )}
@@ -126,9 +133,17 @@ function RankingMobile() {
         ))}
       </div>
 
-      {ranking.length > 0 ? (
+      {tab === 'semana' ? (
+        <div className="flex flex-col items-center gap-2 py-10 text-center px-4">
+          <p className="font-mono text-[11px] text-ink-3">Ranking semanal disponível após o início dos jogos.</p>
+        </div>
+      ) : ranking.length > 0 ? (
         <div className="divide-y divide-hairline">
           {ranking.map(r => <RankingRow key={r.userId} r={r} />)}
+        </div>
+      ) : tab === 'squad' ? (
+        <div className="flex flex-col items-center gap-2 py-10 text-center px-4">
+          <p className="font-mono text-[11px] text-ink-3">Nenhum colega do seu squad pontuou ainda.</p>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-2 py-10 text-center px-4">

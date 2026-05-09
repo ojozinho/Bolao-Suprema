@@ -23,7 +23,6 @@ export interface AppUser {
   color: string
   avatarUrl?: string
   favoriteTeam?: TeamCode
-  championPick?: TeamCode
   since: string
   isAdmin: boolean
   createdAt: string
@@ -74,7 +73,7 @@ export interface PredictionWithMatch extends Prediction {
 
 // ─── Bracket ─────────────────────────────────────────────────────────────────
 
-export type BracketRound = 'r16' | 'qf' | 'sf' | 'final'
+export type BracketRound = 'r16' | 'qf' | 'sf' | 'third' | 'final'
 
 export interface BracketSlot {
   slotId: string // e.g. "r16_m1", "qf_m1"

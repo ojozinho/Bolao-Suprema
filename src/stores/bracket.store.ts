@@ -19,7 +19,7 @@ interface BracketState {
   ) => { home: TeamCode | null; away: TeamCode | null }
 }
 
-// WC2026: 16 R16 → 8 QF → 4 SF → Final
+// WC2026: 16 R16 → 8 QF → 4 SF → Third place (sf_3 vs sf_4) + Final (sf_1 vs sf_2)
 // Each QF picks winner from 2 R16 slots
 const R16_TO_QF: Record<number, { qfPosition: number; side: 'home' | 'away' }> = {
   1:  { qfPosition: 1, side: 'home' },
@@ -52,13 +52,6 @@ const QF_TO_SF: Record<number, { sfPosition: number; side: 'home' | 'away' }> = 
   8: { sfPosition: 4, side: 'away' },
 }
 
-// Each final slot picks winner from 2 SF slots (semifinais)
-const SF_TO_FINAL: Record<number, { side: 'home' | 'away' }> = {
-  1: { side: 'home' },
-  2: { side: 'away' },
-  3: { side: 'home' },  // 3rd place match home
-  4: { side: 'away' },  // 3rd place match away
-}
 
 export const useBracketStore = create<BracketState>()(
   persist(
@@ -130,8 +123,17 @@ export const useBracketStore = create<BracketState>()(
           return { home: home as TeamCode | null, away: away as TeamCode | null }
         }
 
+        if (slotId === 'third_1') {
+          // sf_3 winner vs sf_4 winner
+          const sf3 = getSlot('sf_3')
+          const sf4 = getSlot('sf_4')
+          const home = (sf3?.winner || picks['sf_3']) ?? null
+          const away = (sf4?.winner || picks['sf_4']) ?? null
+          return { home: home as TeamCode | null, away: away as TeamCode | null }
+        }
+
         if (slotId === 'final_1') {
-          // SF 1 winner vs SF 2 winner
+          // sf_1 winner vs sf_2 winner
           const sf1 = getSlot('sf_1')
           const sf2 = getSlot('sf_2')
           const home = (sf1?.winner || picks['sf_1']) ?? null

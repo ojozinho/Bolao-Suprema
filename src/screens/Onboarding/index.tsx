@@ -125,7 +125,7 @@ function OnboardingMobile() {
               PRÓXIMO →
             </button>
           ) : (
-            <button onClick={() => navigate('/login')} className="btn-yellow flex-1">
+            <button onClick={() => { localStorage.setItem('bolao-visited', '1'); navigate('/login') }} className="btn-yellow flex-1">
               BORA JOGAR · ENTRAR
             </button>
           )}
@@ -166,7 +166,7 @@ function OnboardingDesktop() {
           <div>
             <div className="grid grid-cols-4 gap-4 mb-8 border-t border-hairline pt-6">
               {[
-                { val: '104',   label: 'partidas' },
+                { val: '102',   label: 'partidas' },
                 { val: '48',    label: 'seleções' },
                 { val: '11 Jun', label: 'início' },
                 { val: '+25',   label: 'pts campeão' },
@@ -177,7 +177,7 @@ function OnboardingDesktop() {
                 </div>
               ))}
             </div>
-            <button onClick={() => navigate('/login')} className="btn-yellow w-full justify-center text-base">
+            <button onClick={() => { localStorage.setItem('bolao-visited', '1'); navigate('/login') }} className="btn-yellow w-full justify-center text-base">
               ENTRAR NO BOLÃO →
             </button>
           </div>

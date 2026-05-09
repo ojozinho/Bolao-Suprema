@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Flag } from '@/components/shared/Flag'
 import { usePredictionStore } from '@/stores/prediction.store'
@@ -7,6 +7,7 @@ import { useIsDesktop } from '@/hooks/useBreakpoint'
 import { WC2026_MATCHES, WC2026_GROUPS } from '@/data/wc2026'
 import { TEAMS } from '@/data/teams'
 import { clamp, cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth.store'
 import type { Match } from '@/types'
 
 type PredTab = 'groups' | 'champion'
@@ -109,6 +110,7 @@ function ScoreControl({ value, onChange }: { value: number; onChange: (n: number
 
 function MatchRow({ match, onScoreChange }: { match: Match; onScoreChange?: () => void }) {
   const { predictions, drafts, confirmPrediction, setDraft } = usePredictionStore()
+  const userId = useAuthStore(s => s.user?.id ?? 'me')
   const existing = predictions[match.id]
   const draft = drafts[match.id]
 
@@ -128,7 +130,7 @@ function MatchRow({ match, onScoreChange }: { match: Match; onScoreChange?: () =
   const handleConfirm = () => {
     confirmPrediction({
       id: `pred-${match.id}`,
-      userId: 'me',
+      userId,
       matchId: match.id,
       homeScore: home,
       awayScore: away,
@@ -567,8 +569,8 @@ function TeamPickerGrid({
 
 // ─── Champion tab (campeão + vice + artilheiro) ───────────────────────────────
 
-// Deadline for general bets: 2026-06-11T15:00:00 (first match kickoff)
-const GENERAL_DEADLINE = new Date('2026-06-11T15:00:00')
+// Deadline for general bets: 2026-06-11 15:00 BRT = 18:00 UTC (first match kickoff)
+const GENERAL_DEADLINE = new Date('2026-06-11T18:00:00Z')
 
 function ChampionTab() {
   const { championPick, vicePick, scorerPick, setChampionPick, setVicePick, setScorerPick } = usePredictionStore()
@@ -856,8 +858,18 @@ function DesktopGroupSidebar({
 // ─── Root screen ──────────────────────────────────────────────────────────────
 
 export function PredictionScreen() {
-  const [tab, setTab] = useState<PredTab>('groups')
-  const [selectedGroup, setSelectedGroup] = useState('A')
+  const { matchId } = useParams<{ matchId?: string }>()
+  const location = useLocation()
+  const initialTab = (location.state as { tab?: PredTab } | null)?.tab ?? 'groups'
+  const [tab, setTab] = useState<PredTab>(initialTab)
+
+  const initialGroup = useMemo(() => {
+    if (!matchId) return 'A'
+    const m = WC2026_MATCHES.find(m => m.id === matchId)
+    return m?.group ?? 'A'
+  }, [matchId])
+
+  const [selectedGroup, setSelectedGroup] = useState(initialGroup)
   const { predictions } = usePredictionStore()
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
