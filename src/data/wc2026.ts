@@ -60,11 +60,24 @@ function fmtMatchDate(iso: string): string {
   return `${PT_DAYS[String(day)]} ${d} ${PT_MONTHS[String(Number(m) - 1)]}`
 }
 
-// Times in data are in US Eastern time (UTC-4 in summer).
-// Brazil is UTC-3, so add 1 hour to display in BRT.
-function toBRT(time: string): string {
+// UTC offset per venue (summer 2026 DST):
+//   EDT = UTC-4 (US East Coast + Toronto)
+//   CDT = UTC-5 (US Central + Mexico)
+//   PDT = UTC-7 (US West Coast + Vancouver)
+const VENUE_UTC_OFFSET: Record<string, number> = {
+  'MetLife Stadium': -4, 'Gillette Stadium': -4, 'Lincoln Financial Field': -4,
+  'Mercedes-Benz Stadium': -4, 'Hard Rock Stadium': -4, 'BMO Field': -4,
+  'AT&T Stadium': -5, 'NRG Stadium': -5, 'Arrowhead Stadium': -5,
+  'Estadio Azteca': -5, 'Estadio Akron': -5, 'Estadio BBVA': -5,
+  'SoFi Stadium': -7, "Levi's Stadium": -7, 'Lumen Field': -7, 'BC Place': -7,
+}
+
+// Converts local kick-off time to BRT (UTC-3).
+// BRT = local − utcOffset − 3
+function toBRT(time: string, venue: string): string {
+  const utcOffset = VENUE_UTC_OFFSET[venue] ?? -4
   const [h, m] = time.split(':').map(Number)
-  const brtH = (h + 1) % 24
+  const brtH = ((h - utcOffset - 3) % 24 + 24) % 24
   return `${String(brtH).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
@@ -194,7 +207,7 @@ export function resolveMatch(r: RawMatch): Match {
     homeScore: r.homeScore ?? null,
     awayScore: r.awayScore ?? null,
     date: fmtMatchDate(r.date),
-    time: toBRT(r.time),
+    time: toBRT(r.time, r.venue),
     venue: `${r.venue} · ${r.city}`,
     status: r.status,
     liveMinute: r.liveMinute,

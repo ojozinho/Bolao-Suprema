@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Logo } from '@/components/shared/Logo'
 import { TourneyMark } from '@/components/shared/TourneyMark'
 import { useAuthStore } from '@/stores/auth.store'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
-import { MOCK_ME } from '@/data/mock'
 import { asset } from '@/lib/utils'
 
 export function LoginScreen() {
@@ -12,27 +11,36 @@ export function LoginScreen() {
   return isDesktop ? <LoginDesktop /> : <LoginMobile />
 }
 
-function useEnter() {
-  const setUser = useAuthStore((s) => s.setUser)
+function useLoginForm() {
+  const signIn = useAuthStore(s => s.signIn)
   const navigate = useNavigate()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleEnter = (name: string) => {
-    const parts = name.trim().split(' ')
-    const firstName = parts[0] || MOCK_ME.firstName
-    const lastName = parts.slice(1).join(' ') || MOCK_ME.lastName
-    const initials = (firstName[0] + (lastName?.[0] ?? firstName[1] ?? '')).toUpperCase()
-    setUser({ ...MOCK_ME, firstName, lastName, initials })
-    navigate('/home')
+  const canSubmit = email.trim() && password.length >= 6
+
+  const handleEnter = async () => {
+    if (!canSubmit) return
+    setLoading(true)
+    setError('')
+    const result = await signIn(email.trim(), password)
+    setLoading(false)
+    if (result.error) {
+      setError('E-mail ou senha incorretos.')
+    } else {
+      navigate('/home')
+    }
   }
 
-  return { handleEnter }
+  return { email, setEmail, password, setPassword, error, loading, canSubmit, handleEnter }
 }
 
 // ─── Mobile ───────────────────────────────────────────────────────────────────
 
 function LoginMobile() {
-  const [name, setName] = useState('')
-  const { handleEnter } = useEnter()
+  const f = useLoginForm()
 
   return (
     <div className="min-h-dvh flex flex-col relative bg-ink">
@@ -55,27 +63,51 @@ function LoginMobile() {
           só pra galera da firma
         </p>
 
-        <div className="mb-3">
-          <p className="font-mono text-[9px] tracking-eyebrow text-paper/50 mb-1.5">SEU NOME</p>
-          <input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && name.trim() && handleEnter(name)}
-            placeholder="Como aparecer no bolão"
-            autoFocus
-            className="w-full bg-paper/10 border border-paper/20 focus:border-paper/60 px-3 py-3 font-sans text-[14px] text-paper placeholder:text-paper/30 outline-none transition-colors"
-          />
+        <div className="space-y-3 mb-3">
+          <div>
+            <p className="font-mono text-[9px] tracking-eyebrow text-paper/50 mb-1.5">E-MAIL</p>
+            <input
+              type="email"
+              value={f.email}
+              onChange={e => f.setEmail(e.target.value)}
+              placeholder="felipe@suprema.group"
+              autoFocus
+              className="w-full bg-paper/10 border border-paper/20 focus:border-paper/60 px-3 py-3 font-sans text-[14px] text-paper placeholder:text-paper/30 outline-none transition-colors"
+            />
+          </div>
+          <div>
+            <p className="font-mono text-[9px] tracking-eyebrow text-paper/50 mb-1.5">SENHA</p>
+            <input
+              type="password"
+              value={f.password}
+              onChange={e => f.setPassword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && f.handleEnter()}
+              placeholder="••••••••"
+              className="w-full bg-paper/10 border border-paper/20 focus:border-paper/60 px-3 py-3 font-sans text-[14px] text-paper placeholder:text-paper/30 outline-none transition-colors"
+            />
+          </div>
         </div>
 
+        {f.error && (
+          <p className="font-mono text-[11px] text-red bg-red/10 border border-red/20 px-3 py-2 mb-3">
+            {f.error}
+          </p>
+        )}
+
         <button
-          onClick={() => name.trim() && handleEnter(name)}
-          disabled={!name.trim()}
-          className="btn-yellow w-full justify-center disabled:opacity-50"
+          onClick={f.handleEnter}
+          disabled={!f.canSubmit || f.loading}
+          className="btn-yellow w-full justify-center disabled:opacity-50 mb-4"
         >
-          ENTRAR →
+          {f.loading ? 'ENTRANDO…' : 'ENTRAR →'}
         </button>
 
-        <p className="font-mono text-[10px] text-paper/30 tracking-eyebrow text-center mt-6">
+        <p className="font-mono text-[10px] text-paper/40 text-center mb-2">
+          Ainda não tem conta?{' '}
+          <Link to="/register" className="text-yellow hover:text-paper/80">CRIAR CONTA →</Link>
+        </p>
+
+        <p className="font-mono text-[10px] text-paper/30 tracking-eyebrow text-center mt-4">
           ACESSO RESTRITO À SUPREMA GAMING · USO INTERNO
         </p>
       </div>
@@ -86,8 +118,7 @@ function LoginMobile() {
 // ─── Desktop ──────────────────────────────────────────────────────────────────
 
 function LoginDesktop() {
-  const [name, setName] = useState('')
-  const { handleEnter } = useEnter()
+  const f = useLoginForm()
 
   return (
     <div className="min-h-dvh flex bg-paper">
@@ -122,27 +153,51 @@ function LoginDesktop() {
           só pra galera da Suprema
         </p>
 
-        <div className="mb-4">
-          <p className="font-mono text-[9px] tracking-eyebrow text-ink-4 mb-1.5">SEU NOME</p>
-          <input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && name.trim() && handleEnter(name)}
-            placeholder="Como aparecer no bolão"
-            autoFocus
-            className="w-full bg-paper-deep border border-line focus:border-ink px-3 py-3 font-sans text-[14px] outline-none transition-colors placeholder:text-ink-4"
-          />
+        <div className="space-y-4 mb-4">
+          <div>
+            <p className="font-mono text-[9px] tracking-eyebrow text-ink-4 mb-1.5">E-MAIL</p>
+            <input
+              type="email"
+              value={f.email}
+              onChange={e => f.setEmail(e.target.value)}
+              placeholder="felipe@suprema.group"
+              autoFocus
+              className="w-full bg-paper-deep border border-line focus:border-ink px-3 py-3 font-sans text-[14px] outline-none transition-colors placeholder:text-ink-4"
+            />
+          </div>
+          <div>
+            <p className="font-mono text-[9px] tracking-eyebrow text-ink-4 mb-1.5">SENHA</p>
+            <input
+              type="password"
+              value={f.password}
+              onChange={e => f.setPassword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && f.handleEnter()}
+              placeholder="••••••••"
+              className="w-full bg-paper-deep border border-line focus:border-ink px-3 py-3 font-sans text-[14px] outline-none transition-colors placeholder:text-ink-4"
+            />
+          </div>
         </div>
 
+        {f.error && (
+          <p className="font-mono text-[11px] text-red bg-red/10 border border-red/30 px-3 py-2 mb-4">
+            {f.error}
+          </p>
+        )}
+
         <button
-          onClick={() => name.trim() && handleEnter(name)}
-          disabled={!name.trim()}
-          className="btn-yellow w-full justify-center disabled:opacity-50"
+          onClick={f.handleEnter}
+          disabled={!f.canSubmit || f.loading}
+          className="btn-yellow w-full justify-center disabled:opacity-50 mb-4"
         >
-          ENTRAR →
+          {f.loading ? 'ENTRANDO…' : 'ENTRAR →'}
         </button>
 
-        <p className="font-mono text-[10px] text-ink-4 text-center mt-4">
+        <p className="font-mono text-[10px] text-ink-4 text-center mb-1">
+          Ainda não tem conta?{' '}
+          <Link to="/register" className="text-green-deep hover:underline">CRIAR CONTA →</Link>
+        </p>
+
+        <p className="font-mono text-[10px] text-ink-4 text-center mt-3">
           Acesso restrito a colaboradores da Suprema Gaming.
         </p>
       </div>

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/shared/Avatar'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
@@ -221,15 +222,32 @@ function PollModal({ onCreate, onClose }: { onCreate: (poll: ChatPoll) => void; 
 
 // ─── Message Bubbles ────────────────────────────────────────────────────────────
 
+function UserAvatar({ m }: { m: ChatMessage }) {
+  const navigate = useNavigate()
+  return (
+    <button
+      onClick={() => !m.isYou && navigate(`/u/${m.userId}`)}
+      className={cn('flex-shrink-0 mt-1 rounded-full', !m.isYou && 'hover:opacity-80 transition-opacity cursor-pointer')}
+      disabled={m.isYou}
+    >
+      <Avatar initials={m.initials} color={m.color} size={30} />
+    </button>
+  )
+}
+
 function TextBubble({ m }: { m: ChatMessage }) {
+  const navigate = useNavigate()
   return (
     <div className={cn('flex gap-2.5', m.isYou ? 'flex-row-reverse' : '')}>
-      <Avatar initials={m.initials} color={m.color} size={30} className="flex-shrink-0 mt-1" />
+      <UserAvatar m={m} />
       <div className={cn('max-w-[75%] flex flex-col gap-1', m.isYou ? 'items-end' : 'items-start')}>
         {!m.isYou && (
-          <span className="font-mono text-[10px] text-ink-3">
+          <button
+            onClick={() => navigate(`/u/${m.userId}`)}
+            className="font-mono text-[10px] text-ink-3 hover:text-ink transition-colors text-left"
+          >
             {m.who} · {m.dept} · {m.time}
-          </span>
+          </button>
         )}
         <div
           className={cn(
@@ -256,14 +274,18 @@ function TextBubble({ m }: { m: ChatMessage }) {
 }
 
 function GifBubble({ m }: { m: ChatMessage }) {
+  const navigate = useNavigate()
   return (
     <div className={cn('flex gap-2.5', m.isYou ? 'flex-row-reverse' : '')}>
-      <Avatar initials={m.initials} color={m.color} size={30} className="flex-shrink-0 mt-1" />
+      <UserAvatar m={m} />
       <div className={cn('max-w-[60%] flex flex-col gap-1', m.isYou ? 'items-end' : 'items-start')}>
         {!m.isYou && (
-          <span className="font-mono text-[10px] text-ink-3">
+          <button
+            onClick={() => navigate(`/u/${m.userId}`)}
+            className="font-mono text-[10px] text-ink-3 hover:text-ink transition-colors text-left"
+          >
             {m.who} · {m.dept} · {m.time}
-          </span>
+          </button>
         )}
         <div
           className={cn(
@@ -295,13 +317,17 @@ function PollBubble({ m, userVotes, onVote }: {
 
   const totalVotes = Object.keys(poll.votes).length
 
+  const navigate = useNavigate()
   return (
     <div className="flex gap-2.5">
-      <Avatar initials={m.initials} color={m.color} size={30} className="flex-shrink-0 mt-1" />
+      <UserAvatar m={m} />
       <div className="flex-1 max-w-sm">
-        <span className="font-mono text-[10px] text-ink-3 block mb-2">
+        <button
+          onClick={() => navigate(`/u/${m.userId}`)}
+          className="font-mono text-[10px] text-ink-3 hover:text-ink transition-colors block mb-2 text-left"
+        >
           {m.who} · {m.dept} · {m.time}
-        </span>
+        </button>
         <div className="border-2 border-ink bg-paper p-4 shadow-card">
           <div className="flex items-center gap-2 mb-4">
             <span className="text-base leading-none">📊</span>
@@ -446,7 +472,7 @@ export function ResenhaScreen() {
 
   const buildMsg = useCallback(
     (overrides: Partial<ChatMessage>): ChatMessage => ({
-      id: `m-${Date.now()}`,
+      id: crypto.randomUUID(),
       userId: me?.id ?? 'me',
       channelId: 'geral',
       who: me ? `${me.firstName} ${me.lastName}` : 'Você',

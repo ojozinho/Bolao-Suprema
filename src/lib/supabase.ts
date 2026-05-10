@@ -19,7 +19,19 @@ export const supabase = createClient(
   }
 )
 
-// Set VITE_MOCK_AUTH=true in .env.local to bypass real Supabase auth during development.
-// Remove the flag (or set it to false) when ready for production auth.
 export const isMockMode =
   import.meta.env.VITE_MOCK_AUTH === 'true' || !supabaseUrl || !supabaseAnonKey
+
+export async function uploadFile(
+  userId: string,
+  filename: string,
+  file: File,
+): Promise<string | null> {
+  const ext = file.name.split('.').pop() ?? 'jpg'
+  const path = `${userId}/${filename}.${ext}`
+  const { error } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true, contentType: file.type })
+  if (error) { console.error('[Storage]', error); return null }
+  return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl
+}

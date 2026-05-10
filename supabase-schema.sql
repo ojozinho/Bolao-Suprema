@@ -15,11 +15,14 @@ create table if not exists public.users (
   dept          text not null default '',
   initials      text not null default '',
   color         text not null default '#00A651',
-  avatar_url    text,
-  favorite_team text,
-  champion_pick text,
-  since         text not null default extract(year from now())::text,
-  is_admin      boolean not null default false,
+  avatar_url      text,
+  banner_url      text,
+  bio             text,
+  favorite_team   text,
+  favorite_player text,
+  champion_pick   text,
+  since           text not null default extract(year from now())::text,
+  is_admin        boolean not null default false,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
@@ -184,3 +187,34 @@ on conflict (id) do nothing;
 create policy "avatars_read_all"   on storage.objects for select using (bucket_id = 'avatars');
 create policy "avatars_upload_own" on storage.objects for insert
   with check (bucket_id = 'avatars' and auth.uid()::text = (storage.foldername(name))[1]);
+create policy "avatars_update_own" on storage.objects for update
+  using (bucket_id = 'avatars' and auth.uid()::text = (storage.foldername(name))[1]);
+
+-- ============================================================
+-- MIGRATION: adicionar colunas sociais ao perfil (rodar se o
+-- banco já existia antes desta versão)
+-- ============================================================
+
+alter table public.users add column if not exists banner_url      text;
+alter table public.users add column if not exists bio             text;
+alter table public.users add column if not exists favorite_player text;
+alter table public.users add column if not exists vice_pick            text;
+alter table public.users add column if not exists scorer_pick          text;
+alter table public.users add column if not exists favorite_player_img  text;
+
+-- ============================================================
+-- MIGRATION v3: suporte a GIF/poll no chat + palpites por código
+-- ============================================================
+
+-- chat_messages: type (text/gif/poll), gif_url, poll_data jsonb
+alter table public.chat_messages add column if not exists type      text not null default 'text';
+alter table public.chat_messages add column if not exists gif_url   text;
+alter table public.chat_messages add column if not exists poll_data jsonb;
+
+-- predictions: match_code (string natural key, ex: "g-a-1")
+alter table public.predictions add column if not exists match_code text;
+
+-- Unique constraint on user_id + match_code (para upsert sem UUID do match)
+create unique index if not exists predictions_user_match_code
+  on public.predictions (user_id, match_code)
+  where match_code is not null;

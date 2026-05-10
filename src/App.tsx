@@ -2,12 +2,14 @@ import { useEffect } from 'react'
 import { createHashRouter, RouterProvider, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuthStore } from '@/stores/auth.store'
+import { useChatStore } from '@/stores/chat.store'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
 import { MobileNav } from '@/components/navigation/MobileNav'
 import { DesktopNav } from '@/components/navigation/DesktopNav'
 import { Marquee } from '@/components/shared/Marquee'
 import { OnboardingScreen } from '@/screens/Onboarding'
 import { LoginScreen } from '@/screens/Login'
+import { RegisterScreen } from '@/screens/Register'
 import { ProfileScreen } from '@/screens/Profile'
 import { HomeScreen } from '@/screens/Home'
 import { PredictionScreen } from '@/screens/Prediction'
@@ -16,6 +18,7 @@ import { RankingScreen } from '@/screens/Ranking'
 import { ResenhaScreen } from '@/screens/Resenha'
 import { AdminScreen } from '@/screens/Admin'
 import { BoletimScreen } from '@/screens/Boletim'
+import { UserProfileScreen } from '@/screens/UserProfile'
 
 // ─── Root redirect — onboarding for first visit ───────────────────────────────
 
@@ -76,6 +79,16 @@ const MARQUEE_ITEMS = [
 
 function AppLayout() {
   const isDesktop = useIsDesktop()
+  const user = useAuthStore(s => s.user)
+  const initChat = useChatStore(s => s.init)
+  const destroyChat = useChatStore(s => s.destroy)
+
+  useEffect(() => {
+    if (user?.id) {
+      initChat(user.id)
+      return () => { destroyChat() }
+    }
+  }, [user?.id, initChat, destroyChat])
 
   return (
     <div className="min-h-dvh flex flex-col">
@@ -127,6 +140,7 @@ const router = createHashRouter([
   { path: '/', element: <RootRedirect /> },
   { path: '/onboarding', element: <OnboardingScreen /> },
   { path: '/login', element: <LoginScreen /> },
+  { path: '/register', element: <RegisterScreen /> },
 
   // Protected routes
   {
@@ -143,6 +157,7 @@ const router = createHashRouter([
           { path: '/prediction/:matchId', element: <PredictionScreen /> },
           { path: '/ranking', element: <RankingScreen /> },
           { path: '/resenha', element: <ResenhaScreen /> },
+          { path: '/u/:userId', element: <UserProfileScreen /> },
           { path: '/admin', element: <AdminScreen /> },
         ],
       },

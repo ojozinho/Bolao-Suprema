@@ -22,7 +22,11 @@ export interface AppUser {
   initials: string
   color: string
   avatarUrl?: string
+  bannerUrl?: string
+  bio?: string
   favoriteTeam?: TeamCode
+  favoritePlayer?: string
+  favoritePlayerImg?: string
   since: string
   isAdmin: boolean
   createdAt: string
