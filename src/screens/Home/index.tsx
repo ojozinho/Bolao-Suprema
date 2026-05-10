@@ -10,55 +10,155 @@ import { useChatStore } from '@/stores/chat.store'
 import { MOCK_UPCOMING, MOCK_RANKING } from '@/data/mock'
 import { WC2026_MATCHES } from '@/data/wc2026'
 import { TEAMS } from '@/data/teams'
-import { fmtPts, asset, cn } from '@/lib/utils'
+import { fmtPts, cn } from '@/lib/utils'
+import { fetchFeaturedVideos } from '@/lib/scorebat'
+import type { ScorebatVideo } from '@/lib/scorebat'
 
 // ─── Rotating hero background ─────────────────────────────────────────────────
 
 const HERO_THEMES = [
-  { code: 'BRA', label: 'BRASIL',     c1: '#009C3B', c2: '#002776' },
-  { code: 'ARG', label: 'ARGENTINA',  c1: '#74ACDF', c2: '#FFFFFF' },
-  { code: 'FRA', label: 'FRANCE',     c1: '#003087', c2: '#EF4135' },
-  { code: 'GER', label: 'ALEMANHA',   c1: '#1a1a1a', c2: '#FFCC00' },
-  { code: 'ESP', label: 'ESPANHA',    c1: '#AA151B', c2: '#F1BF00' },
-  { code: 'POR', label: 'PORTUGAL',   c1: '#006600', c2: '#FF0000' },
-  { code: 'USA', label: 'USA',        c1: '#002868', c2: '#BF0A30' },
-  { code: 'ENG', label: 'ENGLAND',    c1: '#003087', c2: '#CF081F' },
-  { code: 'NED', label: 'HOLANDA',    c1: '#FF4F00', c2: '#1D2671' },
-  { code: 'MEX', label: 'MÉXICO',     c1: '#006847', c2: '#CE1126' },
+  { code: 'BRA', label: 'BRASIL',    c1: '#009C3B', c2: '#002776' },
+  { code: 'ARG', label: 'ARGENTINA', c1: '#74ACDF', c2: '#004F9F' },
+  { code: 'FRA', label: 'FRANCE',    c1: '#003087', c2: '#EF4135' },
+  { code: 'GER', label: 'ALEMANHA',  c1: '#1a1a1a', c2: '#FFCC00' },
+  { code: 'ESP', label: 'ESPANHA',   c1: '#AA151B', c2: '#F1BF00' },
+  { code: 'POR', label: 'PORTUGAL',  c1: '#006600', c2: '#FF0000' },
+  { code: 'USA', label: 'USA',       c1: '#002868', c2: '#BF0A30' },
+  { code: 'ENG', label: 'ENGLAND',   c1: '#003087', c2: '#CF081F' },
+  { code: 'NED', label: 'HOLANDA',   c1: '#FF4F00', c2: '#1D2671' },
+  { code: 'MEX', label: 'MÉXICO',    c1: '#006847', c2: '#CE1126' },
 ]
+
+// ─── Video highlights strip ────────────────────────────────────────────────────
+
+function VideoHighlights() {
+  const [videos, setVideos] = useState<ScorebatVideo[]>([])
+  const [active, setActive] = useState<ScorebatVideo | null>(null)
+
+  useEffect(() => {
+    fetchFeaturedVideos().then(v => setVideos(v.slice(0, 12)))
+  }, [])
+
+  if (videos.length === 0) return null
+
+  return (
+    <div className="border-2 border-ink">
+      <div className="px-4 py-2.5 border-b border-hairline flex items-baseline justify-between">
+        <div className="flex items-baseline gap-1.5">
+          <span className="font-display text-base">DESTAQUES</span>
+          <span className="font-serif-it text-sm text-ink-3">futebol ao vivo</span>
+        </div>
+        <span className="font-mono text-[8px] text-ink-4 tracking-eyebrow">via scorebat</span>
+      </div>
+
+      {/* Active video */}
+      {active && (
+        <div className="border-b border-hairline">
+          <div className="relative" style={{ paddingBottom: '56.25%' }}>
+            <iframe
+              src={(() => {
+                const m = active.embed.match(/src='([^']+)'/)
+                return m ? m[1] : ''
+              })()}
+              className="absolute inset-0 w-full h-full"
+              frameBorder="0"
+              allowFullScreen
+              allow="autoplay; fullscreen"
+            />
+          </div>
+          <div className="px-3 py-2 flex items-center justify-between bg-ink text-paper">
+            <div>
+              <div className="font-mono text-[11px] font-bold">{active.title}</div>
+              <div className="font-mono text-[9px] text-paper/50 tracking-eyebrow">{active.competition}</div>
+            </div>
+            <button onClick={() => setActive(null)}
+              className="font-mono text-[10px] text-paper/50 hover:text-paper px-2">✕</button>
+          </div>
+        </div>
+      )}
+
+      {/* Thumbnail strip */}
+      <div className="flex gap-0 overflow-x-auto no-scrollbar">
+        {videos.map(v => (
+          <button
+            key={v.matchviewUrl}
+            onClick={() => setActive(active?.matchviewUrl === v.matchviewUrl ? null : v)}
+            className={cn(
+              'relative flex-shrink-0 group transition-opacity',
+              active?.matchviewUrl === v.matchviewUrl ? 'opacity-100' : 'opacity-80 hover:opacity-100'
+            )}
+            style={{ width: 140 }}
+          >
+            <div className="relative overflow-hidden" style={{ height: 80 }}>
+              <img src={v.thumbnail} alt={v.title} className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-ink/40 group-hover:bg-ink/20 transition-colors flex items-center justify-center">
+                <span className="w-7 h-7 rounded-full bg-paper/20 backdrop-blur-sm flex items-center justify-center text-paper text-[10px]">▶</span>
+              </div>
+              {active?.matchviewUrl === v.matchviewUrl && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow" />
+              )}
+            </div>
+            <div className="px-2 py-1.5 bg-paper border-r border-hairline text-left">
+              <div className="font-mono text-[8px] font-bold text-ink leading-tight line-clamp-2">{v.title}</div>
+              <div className="font-mono text-[7px] text-ink-4 tracking-eyebrow mt-0.5 truncate">{v.competition.split(':')[1]?.trim() ?? v.competition}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function RotatingHero({ days, children }: { days: number; children?: React.ReactNode }) {
   const [idx, setIdx] = useState(0)
+  const [bgPhotos, setBgPhotos] = useState<string[]>([])
 
   useEffect(() => {
-    const id = setInterval(() => setIdx(i => (i + 1) % HERO_THEMES.length), 4500)
-    return () => clearInterval(id)
+    fetchFeaturedVideos().then(vids => {
+      const thumbs = vids.filter(v => v.thumbnail).slice(0, 10).map(v => v.thumbnail)
+      setBgPhotos(thumbs)
+    })
   }, [])
 
-  const theme = HERO_THEMES[idx]
+  useEffect(() => {
+    const total = Math.max(HERO_THEMES.length, bgPhotos.length || HERO_THEMES.length)
+    const id = setInterval(() => setIdx(i => (i + 1) % total), 4500)
+    return () => clearInterval(id)
+  }, [bgPhotos.length])
+
+  const theme = HERO_THEMES[idx % HERO_THEMES.length]
   const team = TEAMS[theme.code]
+  const bgPhoto = bgPhotos[idx % (bgPhotos.length || 1)]
 
   return (
     <section className="relative overflow-hidden" style={{ height: 280 }}>
-      {/* Static photo base */}
-      <img
-        src={asset('assets/hero-jogadores.webp')}
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover object-top"
-      />
+      {/* Background photo — Scorebat thumbnail or fallback */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={`bg-${idx}`}
+          initial={{ opacity: 0, scale: 1.05 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 1.4 }}
+          className="absolute inset-0"
+        >
+          {bgPhoto
+            ? <img src={bgPhoto} alt="" className="w-full h-full object-cover" />
+            : <div className="w-full h-full bg-ink" />
+          }
+        </motion.div>
+      </AnimatePresence>
 
       {/* Animated color overlay */}
       <AnimatePresence mode="wait">
         <motion.div
-          key={idx}
+          key={`color-${idx}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 1.2 }}
           className="absolute inset-0"
-          style={{
-            background: `linear-gradient(135deg, ${theme.c1}CC 0%, ${theme.c2}99 100%)`,
-          }}
+          style={{ background: `linear-gradient(135deg, ${theme.c1}DD 0%, ${theme.c2}99 100%)` }}
         />
       </AnimatePresence>
 
@@ -112,25 +212,50 @@ export function HomeScreen() {
 
 function RotatingHeroDesktop({ days, onCta }: { days: number; onCta: () => void }) {
   const [idx, setIdx] = useState(0)
+  const [bgPhotos, setBgPhotos] = useState<string[]>([])
+
   useEffect(() => {
-    const id = setInterval(() => setIdx(i => (i + 1) % HERO_THEMES.length), 4500)
-    return () => clearInterval(id)
+    fetchFeaturedVideos().then(vids => {
+      setBgPhotos(vids.filter(v => v.thumbnail).slice(0, 10).map(v => v.thumbnail))
+    })
   }, [])
-  const theme = HERO_THEMES[idx]
+
+  useEffect(() => {
+    const total = Math.max(HERO_THEMES.length, bgPhotos.length || HERO_THEMES.length)
+    const id = setInterval(() => setIdx(i => (i + 1) % total), 4500)
+    return () => clearInterval(id)
+  }, [bgPhotos.length])
+
+  const theme = HERO_THEMES[idx % HERO_THEMES.length]
   const team = TEAMS[theme.code]
+  const bgPhoto = bgPhotos[idx % (bgPhotos.length || 1)]
 
   return (
     <div className="relative overflow-hidden min-h-[340px] border-2 border-ink">
-      <img src={asset('assets/hero-jogadores.webp')} alt="" className="absolute inset-0 w-full h-full object-cover object-top" />
       <AnimatePresence mode="wait">
         <motion.div
-          key={idx}
+          key={`dbg-${idx}`}
+          initial={{ opacity: 0, scale: 1.05 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 1.4 }}
+          className="absolute inset-0"
+        >
+          {bgPhoto
+            ? <img src={bgPhoto} alt="" className="w-full h-full object-cover" />
+            : <div className="w-full h-full bg-ink" />
+          }
+        </motion.div>
+      </AnimatePresence>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={`dcolor-${idx}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 1.2 }}
           className="absolute inset-0"
-          style={{ background: `linear-gradient(135deg, ${theme.c1}CC 0%, ${theme.c2}88 100%)` }}
+          style={{ background: `linear-gradient(135deg, ${theme.c1}DD 0%, ${theme.c2}88 100%)` }}
         />
       </AnimatePresence>
       <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/20 to-transparent" />
@@ -323,13 +448,14 @@ function HomeMobile() {
             <div className="font-display text-xl">MINHA CHAVE</div>
             <div className="font-serif-it text-sm text-ink-3">oitavas · quartas · semi · final</div>
           </div>
-          <button
-            onClick={() => navigate('/bracket')}
-            className="btn-ink text-[11px] px-4 py-2.5 flex-shrink-0"
-          >
+          <button onClick={() => navigate('/bracket')} className="btn-ink text-[11px] px-4 py-2.5 flex-shrink-0">
             PALPITAR →
           </button>
         </div>
+
+        {/* ── Destaques do futebol ── */}
+        <VideoHighlights />
+
       </div>
 
     </div>
@@ -520,6 +646,10 @@ function HomeDesktop() {
           {/* Resenha CTA */}
           <ResenhaCard />
         </div>
+
+        {/* ── Destaques do futebol — full width ── */}
+        <VideoHighlights />
+
       </div>
 
     </div>
