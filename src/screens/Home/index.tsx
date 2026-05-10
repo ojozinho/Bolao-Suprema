@@ -31,82 +31,191 @@ const HERO_THEMES = [
   { code: 'MEX', label: 'MÉXICO',    c1: '#006847', c2: '#CE1126' },
 ]
 
-// ─── Video highlights strip ────────────────────────────────────────────────────
+// ─── Video highlights ─────────────────────────────────────────────────────────
+
+function extractIframeSrc(embed: string): string {
+  return embed.match(/src='([^']+)'/)?.[1] ?? embed.match(/src="([^"]+)"/)?.[1] ?? ''
+}
+
+function compLabel(competition: string): string {
+  const parts = competition.split(':')
+  return (parts[1] ?? parts[0]).trim().toUpperCase()
+}
+
+function VideoCard({
+  video, isActive, onClick,
+}: {
+  video: ScorebatVideo
+  isActive: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'relative w-full overflow-hidden group text-left border-2 transition-all duration-200',
+        isActive ? 'border-yellow' : 'border-transparent hover:border-ink/30'
+      )}
+    >
+      {/* Thumbnail */}
+      <div className="relative overflow-hidden" style={{ paddingBottom: '56.25%' }}>
+        <img
+          src={video.thumbnail}
+          alt={video.title}
+          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        />
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/20 to-transparent" />
+
+        {/* Competition badge */}
+        <div className="absolute top-2 left-2">
+          <span className="font-mono text-[7px] font-bold tracking-eyebrow bg-yellow text-ink px-1.5 py-0.5 leading-none">
+            {compLabel(video.competition)}
+          </span>
+        </div>
+
+        {/* Play button */}
+        <div className={cn(
+          'absolute inset-0 flex items-center justify-center transition-opacity',
+          isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        )}>
+          <div className={cn(
+            'w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all',
+            isActive ? 'bg-yellow border-yellow text-ink scale-110' : 'bg-paper/20 border-paper/60 text-paper backdrop-blur-sm'
+          )}>
+            <span className="text-[14px] ml-0.5">{isActive ? '■' : '▶'}</span>
+          </div>
+        </div>
+
+        {/* Title at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 p-2.5">
+          <p className="font-mono text-[10px] font-bold text-paper leading-tight line-clamp-2">
+            {video.title}
+          </p>
+        </div>
+      </div>
+    </button>
+  )
+}
 
 function VideoHighlights() {
   const [videos, setVideos] = useState<ScorebatVideo[]>([])
   const [active, setActive] = useState<ScorebatVideo | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchFeaturedVideos().then(v => setVideos(v.slice(0, 12)))
+    fetchFeaturedVideos().then(v => {
+      setVideos(v.slice(0, 11))
+      setLoading(false)
+    })
   }, [])
 
-  if (videos.length === 0) return null
+  if (!loading && videos.length === 0) return null
+
+  const [featured, ...rest] = videos
+  const iframeSrc = active ? extractIframeSrc(active.embed) : ''
+
+  function toggle(v: ScorebatVideo) {
+    setActive(prev => prev?.matchviewUrl === v.matchviewUrl ? null : v)
+  }
 
   return (
-    <div className="border-2 border-ink">
-      <div className="px-4 py-2.5 border-b border-hairline flex items-baseline justify-between">
-        <div className="flex items-baseline gap-1.5">
-          <span className="font-display text-base">DESTAQUES</span>
-          <span className="font-serif-it text-sm text-ink-3">futebol ao vivo</span>
+    <div className="border-2 border-ink overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-hairline bg-ink flex items-center justify-between">
+        <div className="flex items-baseline gap-2">
+          <span className="font-display text-lg text-paper">DESTAQUES</span>
+          <span className="font-serif-it text-base text-paper/50">futebol ao redor do mundo</span>
         </div>
-        <span className="font-mono text-[8px] text-ink-4 tracking-eyebrow">via scorebat</span>
+        <a
+          href="https://www.scorebat.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-[7px] text-paper/30 tracking-eyebrow hover:text-paper/60 transition-colors"
+        >
+          SCOREBAT ↗
+        </a>
       </div>
 
-      {/* Active video */}
-      {active && (
-        <div className="border-b border-hairline">
-          <div className="relative" style={{ paddingBottom: '56.25%' }}>
-            <iframe
-              src={(() => {
-                const m = active.embed.match(/src='([^']+)'/)
-                return m ? m[1] : ''
-              })()}
-              className="absolute inset-0 w-full h-full"
-              frameBorder="0"
-              allowFullScreen
-              allow="autoplay; fullscreen"
-            />
-          </div>
-          <div className="px-3 py-2 flex items-center justify-between bg-ink text-paper">
-            <div>
-              <div className="font-mono text-[11px] font-bold">{active.title}</div>
-              <div className="font-mono text-[9px] text-paper/50 tracking-eyebrow">{active.competition}</div>
-            </div>
-            <button onClick={() => setActive(null)}
-              className="font-mono text-[10px] text-paper/50 hover:text-paper px-2">✕</button>
-          </div>
+      {loading ? (
+        <div className="grid grid-cols-2 gap-0 sm:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-paper-deep animate-pulse border-r border-b border-hairline" style={{ paddingBottom: '56.25%' }} />
+          ))}
         </div>
-      )}
-
-      {/* Thumbnail strip */}
-      <div className="flex gap-0 overflow-x-auto no-scrollbar">
-        {videos.map(v => (
-          <button
-            key={v.matchviewUrl}
-            onClick={() => setActive(active?.matchviewUrl === v.matchviewUrl ? null : v)}
-            className={cn(
-              'relative flex-shrink-0 group transition-opacity',
-              active?.matchviewUrl === v.matchviewUrl ? 'opacity-100' : 'opacity-80 hover:opacity-100'
+      ) : (
+        <>
+          {/* Active player — expands inline with animation */}
+          <AnimatePresence>
+            {active && iframeSrc && (
+              <motion.div
+                key={active.matchviewUrl}
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                className="overflow-hidden border-b-2 border-yellow"
+              >
+                <div className="relative bg-ink" style={{ paddingBottom: '56.25%' }}>
+                  <iframe
+                    src={iframeSrc}
+                    className="absolute inset-0 w-full h-full"
+                    frameBorder="0"
+                    allowFullScreen
+                    allow="autoplay; fullscreen"
+                  />
+                </div>
+                {/* Info bar below player */}
+                <div className="px-4 py-2.5 bg-ink flex items-center justify-between">
+                  <div>
+                    <div className="font-display text-base text-paper leading-tight">{active.title}</div>
+                    <div className="font-mono text-[9px] text-paper/40 tracking-eyebrow mt-0.5">
+                      {compLabel(active.competition)}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActive(null)}
+                    className="w-8 h-8 rounded-full border border-paper/20 flex items-center justify-center text-paper/50 hover:text-paper hover:border-paper/60 transition-colors font-mono text-[11px]"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </motion.div>
             )}
-            style={{ width: 140 }}
-          >
-            <div className="relative overflow-hidden" style={{ height: 80 }}>
-              <img src={v.thumbnail} alt={v.title} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-ink/40 group-hover:bg-ink/20 transition-colors flex items-center justify-center">
-                <span className="w-7 h-7 rounded-full bg-paper/20 backdrop-blur-sm flex items-center justify-center text-paper text-[10px]">▶</span>
+          </AnimatePresence>
+
+          {/* Featured video — full width */}
+          {featured && (
+            <div className="border-b border-hairline">
+              <VideoCard
+                video={featured}
+                isActive={active?.matchviewUrl === featured.matchviewUrl}
+                onClick={() => toggle(featured)}
+              />
+            </div>
+          )}
+
+          {/* Grid of remaining videos */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {rest.map((v, i) => (
+              <div
+                key={v.matchviewUrl}
+                className={cn(
+                  'border-hairline',
+                  i % 2 === 0 ? 'border-r' : '',
+                  Math.floor(i / 2) < Math.floor((rest.length - 1) / 2) ? 'border-b' : ''
+                )}
+              >
+                <VideoCard
+                  video={v}
+                  isActive={active?.matchviewUrl === v.matchviewUrl}
+                  onClick={() => toggle(v)}
+                />
               </div>
-              {active?.matchviewUrl === v.matchviewUrl && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow" />
-              )}
-            </div>
-            <div className="px-2 py-1.5 bg-paper border-r border-hairline text-left">
-              <div className="font-mono text-[8px] font-bold text-ink leading-tight line-clamp-2">{v.title}</div>
-              <div className="font-mono text-[7px] text-ink-4 tracking-eyebrow mt-0.5 truncate">{v.competition.split(':')[1]?.trim() ?? v.competition}</div>
-            </div>
-          </button>
-        ))}
-      </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }

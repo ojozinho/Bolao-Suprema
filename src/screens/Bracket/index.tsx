@@ -502,7 +502,7 @@ function BracketMobile() {
   const r16HasTeams   = Object.values(myR16Picks).some(v => v.home !== null || v.away !== null)
 
   return (
-    <div className="min-h-dvh bg-paper">
+    <div className="min-h-dvh bg-paper pb-28">
       {/* ── Header Copa 2026 ── */}
       <div className="relative overflow-hidden border-b-2 border-ink px-4 pt-5 pb-4">
         <div className="absolute inset-0 bg-gradient-to-br from-ink via-ink/95 to-ink/80" />
