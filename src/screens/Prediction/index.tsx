@@ -412,7 +412,7 @@ function GroupsTab() {
   return (
     <div className="pb-24">
       {/* Group pill selector */}
-      <div className="px-3 py-3 border-b border-hairline bg-paper sticky top-[104px] z-10 overflow-x-auto">
+      <div className="px-3 py-3 border-b border-hairline bg-paper sticky top-[44px] z-10 overflow-x-auto">
         <div className="flex gap-1.5 min-w-max">
           {GROUP_LABELS.map(g => {
             const done = countPerGroup[g] === 6
@@ -924,7 +924,7 @@ export function PredictionScreen() {
       </div>
 
       {/* ── Tabs ── */}
-      <div className="border-b border-hairline flex sticky top-0 md:top-14 bg-paper z-20">
+      <div className="border-b border-hairline flex sticky top-0 lg:top-14 bg-paper z-20">
         {tabs.map(t => (
           <button
             key={t.id}

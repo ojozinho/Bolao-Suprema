@@ -553,6 +553,17 @@ export function ResenhaScreen() {
 
       {/* ── Messages ── */}
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-3 min-h-0">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-16">
+            <span className="font-display text-6xl text-ink-4">⚽</span>
+            <div>
+              <div className="font-display text-2xl text-ink leading-tight">NINGUÉM<br/>FALOU NADA.</div>
+              <p className="font-mono text-[11px] text-ink-3 mt-2 max-w-[220px] mx-auto leading-relaxed">
+                A resenha começa com você. Manda a primeira mensagem.
+              </p>
+            </div>
+          </div>
+        )}
         {messages.map(m => (
           <div
             key={m.id}

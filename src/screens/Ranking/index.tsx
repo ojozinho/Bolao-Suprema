@@ -133,6 +133,27 @@ function RankingMobile() {
         ))}
       </div>
 
+      {tab === 'geral' && ranking.length === 0 && (
+        <div className="mx-4 mt-4 border-2 border-ink p-4">
+          <p className="font-mono text-[10px] tracking-eyebrow text-ink-3 mb-3">COMO PONTUAR</p>
+          <div className="space-y-2">
+            {[
+              { pts: '10', label: 'Placar exato' },
+              { pts: '7',  label: 'Resultado + diferença de gols' },
+              { pts: '3',  label: 'Só o vencedor' },
+              { pts: '25', label: 'Campeão (aposta geral)' },
+              { pts: '15', label: 'Vice-campeão' },
+              { pts: '10', label: 'Artilheiro' },
+            ].map(r => (
+              <div key={r.label} className="flex items-center gap-2">
+                <span className="font-display text-xl text-green w-8 flex-shrink-0">+{r.pts}</span>
+                <span className="font-mono text-[11px] text-ink-3">{r.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {tab === 'semana' ? (
         <div className="flex flex-col items-center gap-2 py-10 text-center px-4">
           <p className="font-mono text-[11px] text-ink-3">Ranking semanal disponível após o início dos jogos.</p>
@@ -272,10 +293,10 @@ function RankingDesktop() {
               <p className="font-mono text-[10px] tracking-eyebrow text-ink-3 mb-3">COMO PONTUAR</p>
               <div className="space-y-2">
                 {[
-                  { pts: '10', label: 'Placar exato (grupos)' },
-                  { pts: '7',  label: 'Resultado + gols de 1 time' },
-                  { pts: '5',  label: 'Acerto do resultado' },
-                  { pts: '25', label: 'Campeão (longo prazo)' },
+                  { pts: '10', label: 'Placar exato' },
+                  { pts: '7',  label: 'Resultado + diferença de gols' },
+                  { pts: '3',  label: 'Só o vencedor' },
+                  { pts: '25', label: 'Campeão (aposta geral)' },
                   { pts: '15', label: 'Vice-campeão' },
                   { pts: '10', label: 'Artilheiro' },
                 ].map(r => (
