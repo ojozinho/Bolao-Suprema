@@ -60,6 +60,14 @@ function fmtMatchDate(iso: string): string {
   return `${PT_DAYS[String(day)]} ${d} ${PT_MONTHS[String(Number(m) - 1)]}`
 }
 
+// Times in data are in US Eastern time (UTC-4 in summer).
+// Brazil is UTC-3, so add 1 hour to display in BRT.
+function toBRT(time: string): string {
+  const [h, m] = time.split(':').map(Number)
+  const brtH = (h + 1) % 24
+  return `${String(brtH).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 // ─── Raw match schedule — all 72 group stage matches ─────────────────────────
 
 const RAW: RawMatch[] = [
@@ -186,7 +194,7 @@ export function resolveMatch(r: RawMatch): Match {
     homeScore: r.homeScore ?? null,
     awayScore: r.awayScore ?? null,
     date: fmtMatchDate(r.date),
-    time: r.time,
+    time: toBRT(r.time),
     venue: `${r.venue} · ${r.city}`,
     status: r.status,
     liveMinute: r.liveMinute,

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/shared/Logo'
 import { TourneyMark } from '@/components/shared/TourneyMark'
@@ -15,8 +16,12 @@ function useEnter() {
   const setUser = useAuthStore((s) => s.setUser)
   const navigate = useNavigate()
 
-  const handleEnter = () => {
-    setUser(MOCK_ME)
+  const handleEnter = (name: string) => {
+    const parts = name.trim().split(' ')
+    const firstName = parts[0] || MOCK_ME.firstName
+    const lastName = parts.slice(1).join(' ') || MOCK_ME.lastName
+    const initials = (firstName[0] + (lastName?.[0] ?? firstName[1] ?? '')).toUpperCase()
+    setUser({ ...MOCK_ME, firstName, lastName, initials })
     navigate('/home')
   }
 
@@ -26,6 +31,7 @@ function useEnter() {
 // ─── Mobile ───────────────────────────────────────────────────────────────────
 
 function LoginMobile() {
+  const [name, setName] = useState('')
   const { handleEnter } = useEnter()
 
   return (
@@ -49,7 +55,23 @@ function LoginMobile() {
           só pra galera da firma
         </p>
 
-        <button onClick={handleEnter} className="btn-yellow w-full justify-center">
+        <div className="mb-3">
+          <p className="font-mono text-[9px] tracking-eyebrow text-paper/50 mb-1.5">SEU NOME</p>
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && name.trim() && handleEnter(name)}
+            placeholder="Como aparecer no bolão"
+            autoFocus
+            className="w-full bg-paper/10 border border-paper/20 focus:border-paper/60 px-3 py-3 font-sans text-[14px] text-paper placeholder:text-paper/30 outline-none transition-colors"
+          />
+        </div>
+
+        <button
+          onClick={() => name.trim() && handleEnter(name)}
+          disabled={!name.trim()}
+          className="btn-yellow w-full justify-center disabled:opacity-50"
+        >
           ENTRAR →
         </button>
 
@@ -64,6 +86,7 @@ function LoginMobile() {
 // ─── Desktop ──────────────────────────────────────────────────────────────────
 
 function LoginDesktop() {
+  const [name, setName] = useState('')
   const { handleEnter } = useEnter()
 
   return (
@@ -86,7 +109,7 @@ function LoginDesktop() {
         </div>
       </div>
 
-      {/* Right — Button */}
+      {/* Right — Form */}
       <div className="w-full lg:w-[480px] flex flex-col justify-center px-10 py-12 bg-paper">
         <Logo height={40} className="mb-10" />
 
@@ -95,11 +118,27 @@ function LoginDesktop() {
         <h1 className="font-display text-5xl leading-none mb-2">
           ENTRAR<br />NO BOLÃO
         </h1>
-        <p className="font-serif-it text-green-deep text-xl mb-10">
+        <p className="font-serif-it text-green-deep text-xl mb-8">
           só pra galera da Suprema
         </p>
 
-        <button onClick={handleEnter} className="btn-yellow w-full justify-center">
+        <div className="mb-4">
+          <p className="font-mono text-[9px] tracking-eyebrow text-ink-4 mb-1.5">SEU NOME</p>
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && name.trim() && handleEnter(name)}
+            placeholder="Como aparecer no bolão"
+            autoFocus
+            className="w-full bg-paper-deep border border-line focus:border-ink px-3 py-3 font-sans text-[14px] outline-none transition-colors placeholder:text-ink-4"
+          />
+        </div>
+
+        <button
+          onClick={() => name.trim() && handleEnter(name)}
+          disabled={!name.trim()}
+          className="btn-yellow w-full justify-center disabled:opacity-50"
+        >
           ENTRAR →
         </button>
 

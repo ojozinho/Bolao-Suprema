@@ -1,14 +1,15 @@
 import { useNavigate } from 'react-router-dom'
 import { Flag } from '@/components/shared/Flag'
+import { Avatar } from '@/components/shared/Avatar'
 import { Marquee } from '@/components/shared/Marquee'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
 import { useAuthStore } from '@/stores/auth.store'
 import { usePredictionStore } from '@/stores/prediction.store'
-import { MOCK_UPCOMING } from '@/data/mock'
+import { MOCK_UPCOMING, MOCK_RANKING } from '@/data/mock'
 import { WC2026_MATCHES } from '@/data/wc2026'
-import { asset, cn } from '@/lib/utils'
+import { fmtPts, asset, cn } from '@/lib/utils'
 
-const TOURNAMENT_START = new Date('2026-06-11T18:00:00Z')
+const TOURNAMENT_START = new Date('2026-06-11T19:00:00Z') // 16:00 BRT = 19:00 UTC
 
 const MARQUEE_ITEMS = [
   'COPA DO MUNDO 2026',
@@ -61,6 +62,8 @@ function HomeMobile() {
   const totalMatches = WC2026_MATCHES.length
   const totalPredictions = Object.keys(predictions).length
   const apostasFeitas = [championPick, vicePick, scorerPick].filter(Boolean).length
+  const top3 = MOCK_RANKING.slice(0, 3)
+  const myRank = MOCK_RANKING.find(r => r.isYou)
 
   return (
     <div className="min-h-dvh bg-paper pb-24">
@@ -79,7 +82,7 @@ function HomeMobile() {
           </div>
           <div className="font-display text-[80px] leading-none text-paper">{days}</div>
           <div className="font-display text-2xl text-paper/70 -mt-1">DIAS</div>
-          <div className="font-serif-it text-sm text-yellow mt-1">para a bola rolar · 11 Jun · 15:00</div>
+          <div className="font-serif-it text-sm text-yellow mt-1">para a bola rolar · 11 Jun · 16:00</div>
         </div>
       </section>
 
@@ -134,6 +137,42 @@ function HomeMobile() {
           </button>
         </div>
 
+        {/* ── Ranking preview ── */}
+        {top3.length > 0 && (
+          <div className="border-2 border-ink">
+            <div className="px-4 py-2.5 border-b border-hairline flex items-baseline justify-between">
+              <span className="font-display text-base">RANKING</span>
+              <button onClick={() => navigate('/ranking')} className="font-mono text-[10px] text-ink-4 hover:text-ink">
+                VER TUDO →
+              </button>
+            </div>
+            <div className="divide-y divide-hairline">
+              {top3.map(r => (
+                <div key={r.userId} className={cn('flex items-center gap-3 px-4 py-2.5', r.isYou && 'bg-yellow')}>
+                  <span className="font-display text-xl w-6 flex-shrink-0">{r.rank}°</span>
+                  <Avatar initials={r.initials} color={r.color} size={28} />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-mono text-[11px] font-bold truncate">{r.name}</div>
+                    <div className="font-mono text-[9px] text-ink-3">{r.dept}</div>
+                  </div>
+                  <span className="font-display text-lg">{fmtPts(r.pts)}</span>
+                </div>
+              ))}
+              {myRank && myRank.rank > 3 && (
+                <div className="flex items-center gap-3 px-4 py-2.5 bg-yellow">
+                  <span className="font-display text-xl w-6 flex-shrink-0">{myRank.rank}°</span>
+                  <Avatar initials={myRank.initials} color={myRank.color} size={28} />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-mono text-[11px] font-bold truncate">Você</div>
+                    <div className="font-mono text-[9px] text-ink-3">{myRank.dept}</div>
+                  </div>
+                  <span className="font-display text-lg">{fmtPts(myRank.pts)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Apostas gerais CTA ── */}
         {apostasFeitas < 3 && (
           <div className="border-2 border-yellow bg-yellow/10 p-4">
@@ -142,23 +181,29 @@ function HomeMobile() {
               CAMPEÃO · VICE · ARTILHEIRO
             </p>
             <p className="font-mono text-[10px] text-ink-3 mb-3">
-              Prazo: antes de 11 Jun · 15:00 · vale até +50 pontos
+              Prazo: antes de 11 Jun · 16:00 · vale até +50 pontos
             </p>
-            <button onClick={() => navigate('/prediction')} className="btn-ink text-[11px] w-full justify-center">
+            <button
+              onClick={() => navigate('/prediction', { state: { tab: 'champion' } })}
+              className="btn-ink text-[11px] w-full justify-center"
+            >
               FAZER APOSTAS GERAIS →
             </button>
           </div>
         )}
 
-        {/* ── Bracket CTA ── */}
+        {/* ── Mata-mata CTA ── */}
         <div className="border-2 border-ink p-4 flex items-center justify-between gap-3">
           <div>
             <div className="font-mono text-[10px] tracking-eyebrow text-ink-3 mb-0.5">MATA-MATA</div>
-            <div className="font-display text-xl">CHAVEAMENTO</div>
+            <div className="font-display text-xl">MINHA CHAVE</div>
             <div className="font-serif-it text-sm text-ink-3">oitavas · quartas · semi · final</div>
           </div>
-          <button onClick={() => navigate('/bracket')} className="btn-ink text-[11px] px-4 py-2.5 flex-shrink-0">
-            VER →
+          <button
+            onClick={() => navigate('/prediction', { state: { tab: 'bracket' } })}
+            className="btn-ink text-[11px] px-4 py-2.5 flex-shrink-0"
+          >
+            PALPITAR →
           </button>
         </div>
       </div>
@@ -183,6 +228,8 @@ function HomeDesktop() {
   const totalMatches = WC2026_MATCHES.length
   const totalPredictions = Object.keys(predictions).length
   const apostasFeitas = [championPick, vicePick, scorerPick].filter(Boolean).length
+  const top5 = MOCK_RANKING.slice(0, 5)
+  const myRank = MOCK_RANKING.find(r => r.isYou)
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -210,7 +257,7 @@ function HomeDesktop() {
                 </div>
                 <div className="pb-2">
                   <div className="font-serif-it text-xl text-yellow">para a bola rolar</div>
-                  <div className="font-mono text-[11px] text-paper/50 mt-1">Fase de grupos · 11 Jun · 15:00</div>
+                  <div className="font-mono text-[11px] text-paper/50 mt-1">Fase de grupos · 11 Jun · 16:00</div>
                 </div>
               </div>
               <button onClick={() => navigate('/prediction')} className="btn-yellow w-fit">
@@ -255,32 +302,51 @@ function HomeDesktop() {
                 {totalPredictions === 0 ? 'COMEÇAR →' : 'CONTINUAR →'}
               </button>
               {apostasFeitas < 3 && (
-                <div className="border border-yellow/30 p-2 text-center">
+                <button
+                  onClick={() => navigate('/prediction', { state: { tab: 'champion' } })}
+                  className="w-full border border-yellow/30 p-2 text-center hover:bg-yellow/10 transition-colors"
+                >
                   <span className="font-mono text-[9px] text-yellow tracking-eyebrow">
                     ⚠ APOSTAS GERAIS PENDENTES
                   </span>
-                </div>
+                </button>
               )}
             </div>
           </div>
 
-          {/* Ranking — empty state */}
+          {/* Ranking preview */}
           <div className="border-2 border-ink flex flex-col">
             <div className="px-4 py-3 border-b border-hairline flex items-baseline justify-between">
               <div className="flex items-baseline gap-2">
                 <span className="font-display text-lg">RANKING</span>
-                <span className="font-serif-it text-sm text-ink-3">em breve</span>
+                {myRank && <span className="font-serif-it text-sm text-ink-3">{myRank.rank}° você</span>}
               </div>
               <button onClick={() => navigate('/ranking')} className="font-mono text-[10px] text-ink-4 hover:text-ink">
                 VER TUDO →
               </button>
             </div>
-            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-3">
-              <span className="font-display text-5xl text-ink-4">—</span>
-              <p className="font-mono text-[11px] text-ink-3 leading-relaxed max-w-[160px]">
-                Os pontos aparecem aqui quando os jogos começarem.
-              </p>
-            </div>
+            {top5.length > 0 ? (
+              <div className="flex-1 divide-y divide-hairline">
+                {top5.map(r => (
+                  <div key={r.userId} className={cn('flex items-center gap-2 px-4 py-2', r.isYou && 'bg-yellow')}>
+                    <span className="font-display text-base w-5 flex-shrink-0">{r.rank}</span>
+                    <Avatar initials={r.initials} color={r.color} size={24} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-mono text-[10px] font-bold truncate">{r.name.split(' ')[0]}</div>
+                      <div className="font-mono text-[8px] text-ink-3">{r.dept}</div>
+                    </div>
+                    <span className="font-display text-base">{fmtPts(r.pts)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-3">
+                <span className="font-display text-5xl text-ink-4">—</span>
+                <p className="font-mono text-[11px] text-ink-3 leading-relaxed max-w-[160px]">
+                  Os pontos aparecem aqui quando os jogos começarem.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -337,18 +403,21 @@ function HomeDesktop() {
             </button>
           </div>
 
-          {/* Bracket CTA */}
+          {/* Mata-mata CTA */}
           <div className="border-2 border-ink flex flex-col">
             <div className="px-4 py-3 border-b border-hairline flex items-baseline gap-2">
-              <span className="font-display text-lg">CHAVEAMENTO</span>
+              <span className="font-display text-lg">MINHA CHAVE</span>
               <span className="font-serif-it text-sm text-ink-3">mata-mata</span>
             </div>
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4">
               <p className="font-mono text-[11px] text-ink-3 leading-relaxed">
-                Oitavas a partir de 27 Jun. Palpite no mata-mata já disponível.
+                Palpite no mata-mata — oitavas a partir de 27 Jun. Seus palpites de grupo determinam as equipes.
               </p>
-              <button onClick={() => navigate('/bracket')} className="btn-yellow w-full justify-center">
-                VER CHAVEAMENTO →
+              <button
+                onClick={() => navigate('/prediction', { state: { tab: 'bracket' } })}
+                className="btn-yellow w-full justify-center"
+              >
+                MINHA CHAVE →
               </button>
             </div>
           </div>
