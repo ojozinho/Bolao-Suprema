@@ -18,17 +18,18 @@ const path  = require('path')
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
 
-const SITE_URL = 'https://ojozinho.github.io/Bolao-Suprema'
-const PAT      = process.argv[2]
-let   PROJECT_REF = process.argv[3] || ''  // opcional: passar ref manualmente
+const SITE_URL     = 'https://ojozinho.github.io/Bolao-Suprema'
+const SMTP_FROM    = 'Bolão Suprema <bolao@suprema.group>'
+const PAT          = process.argv[2]
+const RESEND_KEY   = process.argv[3] || ''  // opcional: re_xxxxx
+let   PROJECT_REF  = process.argv[4] || ''  // opcional: ref manual
 
 if (!PAT) {
   console.error('\n❌ Token não informado.\n')
-  console.error('Uso: node supabase-setup.js <SEU_TOKEN>\n')
-  console.error('Como obter o token:')
-  console.error('  1. Abra: https://supabase.com/dashboard/account/tokens')
-  console.error('  2. Clique em "Generate new token"')
-  console.error('  3. Cole o token no comando acima\n')
+  console.error('Uso básico:')
+  console.error('  node supabase-setup.cjs <SUPABASE_TOKEN>\n')
+  console.error('Com Resend (remove limite de e-mails):')
+  console.error('  node supabase-setup.cjs <SUPABASE_TOKEN> <RESEND_API_KEY>\n')
   process.exit(1)
 }
 
@@ -484,6 +485,18 @@ async function main() {
     mailer_templates_magic_link_content: emailTemplate,
   }
 
+  // SMTP customizado via Resend (remove o rate limit do Supabase)
+  if (RESEND_KEY) {
+    authConfig.smtp_admin_email  = 'bolao@suprema.group'
+    authConfig.smtp_host         = 'smtp.resend.com'
+    authConfig.smtp_port         = 465
+    authConfig.smtp_user         = 'resend'
+    authConfig.smtp_pass         = RESEND_KEY
+    authConfig.smtp_sender_name  = 'Bolão Suprema'
+    authConfig.rate_limit_email_sent = 60  // 60 e-mails por hora por endereço
+    console.log('  ▸ SMTP via Resend configurado no payload')
+  }
+
   const authRes = await apiRequest('PATCH', `/v1/projects/${PROJECT_REF}/config/auth`, authConfig)
   if (authRes.status >= 400) {
     console.log('  ⚠️  Configuração de auth retornou erro:')
@@ -493,6 +506,7 @@ async function main() {
     console.log('  ▸ OTP habilitado ✓')
     console.log('  ▸ Template de e-mail configurado ✓')
     console.log('  ▸ Site URL configurado ✓')
+    if (RESEND_KEY) console.log('  ▸ SMTP Resend ativado — sem limite de e-mails ✓')
   }
 
   // ── 4. Resumo ─────────────────────────────────────────────────────────────
