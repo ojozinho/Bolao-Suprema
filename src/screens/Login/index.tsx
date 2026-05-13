@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, KeyboardEvent } from 'react'
+import { useState, useEffect, KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Logo } from '@/components/shared/Logo'
@@ -17,7 +17,7 @@ function useOtpFlow() {
 
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
-  const [digits, setDigits] = useState(['', '', '', '', '', ''])
+  const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
@@ -30,8 +30,7 @@ function useOtpFlow() {
   }, [resendCooldown])
 
   const canSendEmail = email.trim().toLowerCase().endsWith('@suprema.group')
-  const code = digits.join('')
-  const codeComplete = code.length === 6
+  const codeComplete = code.length >= 6
 
   const handleSendOtp = async () => {
     if (!canSendEmail || loading) return
@@ -55,7 +54,7 @@ function useOtpFlow() {
     setLoading(false)
     if (res.error) {
       setError(res.error)
-      setDigits(['', '', '', '', '', ''])
+      setCode('')
     } else {
       navigate('/home', { replace: true })
     }
@@ -73,84 +72,56 @@ function useOtpFlow() {
 
   const handleBack = () => {
     setStep('email')
-    setDigits(['', '', '', '', '', ''])
+    setCode('')
     setError('')
   }
 
   return {
-    step, email, setEmail, digits, setDigits,
+    step, email, setEmail, code, setCode,
     error, loading, canSendEmail, codeComplete,
     resendCooldown,
     handleSendOtp, handleVerify, handleResend, handleBack,
   }
 }
 
-// ─── 6-digit code input ────────────────────────────────────────────────────────
+// ─── Code input — aceita qualquer tamanho de OTP ──────────────────────────────
 
 function CodeInput({
-  digits,
-  setDigits,
-  onComplete,
+  value,
+  onChange,
+  onSubmit,
   light,
 }: {
-  digits: string[]
-  setDigits: (d: string[]) => void
-  onComplete: () => void
+  value: string
+  onChange: (v: string) => void
+  onSubmit: () => void
   light?: boolean
 }) {
-  const refs = useRef<(HTMLInputElement | null)[]>([])
-
-  const focus = (i: number) => refs.current[i]?.focus()
-
-  const handleChange = (i: number, val: string) => {
-    const digit = val.replace(/\D/g, '').slice(-1)
-    const next = [...digits]
-    next[i] = digit
-    setDigits(next)
-    if (digit && i < 5) focus(i + 1)
-    if (next.join('').length === 6) onComplete()
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value.replace(/\D/g, '').slice(0, 8)
+    onChange(v)
   }
 
-  const handleKeyDown = (i: number, e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !digits[i] && i > 0) {
-      focus(i - 1)
-    }
-    if (e.key === 'Enter' && digits.join('').length === 6) onComplete()
-  }
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-    if (!pasted) return
-    e.preventDefault()
-    const next = [...digits]
-    for (let i = 0; i < 6; i++) next[i] = pasted[i] ?? ''
-    setDigits(next)
-    focus(Math.min(pasted.length, 5))
-    if (pasted.length === 6) onComplete()
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && value.length >= 6) onSubmit()
   }
 
   const base = light
-    ? 'border-paper/30 bg-paper/10 text-paper focus:border-yellow caret-yellow'
-    : 'border-line bg-paper-deep text-ink focus:border-ink caret-ink'
+    ? 'border-paper/30 bg-paper/10 text-paper focus:border-yellow caret-yellow placeholder:text-paper/20'
+    : 'border-line bg-paper-deep text-ink focus:border-ink caret-ink placeholder:text-ink-4'
 
   return (
-    <div className="flex gap-2">
-      {digits.map((d, i) => (
-        <input
-          key={i}
-          ref={el => { refs.current[i] = el }}
-          type="text"
-          inputMode="numeric"
-          maxLength={1}
-          value={d}
-          autoFocus={i === 0}
-          onChange={e => handleChange(i, e.target.value)}
-          onKeyDown={e => handleKeyDown(i, e)}
-          onPaste={handlePaste}
-          className={`w-full aspect-square text-center font-display text-2xl border outline-none transition-colors ${base}`}
-        />
-      ))}
-    </div>
+    <input
+      type="text"
+      inputMode="numeric"
+      autoFocus
+      autoComplete="one-time-code"
+      value={value}
+      onChange={handleChange}
+      onKeyDown={handleKeyDown}
+      placeholder="●●●●●●●●"
+      className={`w-full text-center font-display text-4xl tracking-[0.25em] border-2 outline-none transition-colors py-4 ${base}`}
+    />
   )
 }
 
@@ -257,12 +228,12 @@ function LoginMobile() {
 
               <div className="mb-4">
                 <p className="font-mono text-[9px] tracking-eyebrow text-paper/50 mb-2">
-                  CÓDIGO DE 6 DÍGITOS
+                  CÓDIGO DO E-MAIL
                 </p>
                 <CodeInput
-                  digits={f.digits}
-                  setDigits={f.setDigits}
-                  onComplete={f.handleVerify}
+                  value={f.code}
+                  onChange={f.setCode}
+                  onSubmit={f.handleVerify}
                   light
                 />
               </div>
@@ -408,12 +379,12 @@ function LoginDesktop() {
 
               <div className="mb-4">
                 <p className="font-mono text-[9px] tracking-eyebrow text-ink-4 mb-2">
-                  CÓDIGO DE 6 DÍGITOS
+                  CÓDIGO DO E-MAIL
                 </p>
                 <CodeInput
-                  digits={f.digits}
-                  setDigits={f.setDigits}
-                  onComplete={f.handleVerify}
+                  value={f.code}
+                  onChange={f.setCode}
+                  onSubmit={f.handleVerify}
                 />
               </div>
 
