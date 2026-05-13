@@ -13,7 +13,6 @@ import { RegisterScreen } from '@/screens/Register'
 import { ProfileScreen } from '@/screens/Profile'
 import { HomeScreen } from '@/screens/Home'
 import { PredictionScreen } from '@/screens/Prediction'
-import { BracketScreen } from '@/screens/Bracket'
 import { RankingScreen } from '@/screens/Ranking'
 import { ResenhaScreen } from '@/screens/Resenha'
 import { AdminScreen } from '@/screens/Admin'
@@ -152,7 +151,7 @@ const router = createHashRouter([
         children: [
           { path: '/home', element: <HomeScreen /> },
           { path: '/boletim', element: <BoletimScreen /> },
-          { path: '/bracket', element: <BracketScreen /> },
+          { path: '/bracket', element: <Navigate to="/prediction" state={{ tab: 'knockout' }} replace /> },
           { path: '/prediction', element: <PredictionScreen /> },
           { path: '/prediction/:matchId', element: <PredictionScreen /> },
           { path: '/ranking', element: <RankingScreen /> },
