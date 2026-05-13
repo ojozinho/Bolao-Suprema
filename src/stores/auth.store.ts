@@ -55,13 +55,8 @@ interface AuthState {
   profileComplete: boolean
 
   setUser: (user: AppUser | null) => void
-  signUp: (
-    email: string,
-    password: string,
-    profile: { firstName: string; lastName: string; dept: string; color: string },
-    photoFile: File,
-  ) => Promise<{ error?: string }>
-  signIn: (email: string, password: string) => Promise<{ error?: string }>
+  sendOtp: (email: string) => Promise<{ error?: string }>
+  verifyOtp: (email: string, token: string) => Promise<{ error?: string }>
   signOut: () => Promise<void>
   loadSession: () => Promise<void>
   updateProfile: (data: Partial<AppUser>, photoFile?: File, bannerFile?: File) => Promise<void>
@@ -86,76 +81,63 @@ export const useAuthStore = create<AuthState>()(
           isLoading: false,
         }),
 
-      signUp: async (email, password, profile, photoFile) => {
-        if (isMockMode) {
-          const initials = getInitials(`${profile.firstName} ${profile.lastName}`)
-          const user: AppUser = {
-            ...MOCK_ME,
-            email,
-            firstName: profile.firstName,
-            lastName: profile.lastName,
-            dept: profile.dept,
-            color: profile.color,
-            initials,
-          }
-          set({ user, isAuthenticated: true, profileComplete: true, isLoading: false })
-          return {}
+      sendOtp: async (email) => {
+        const normalized = email.trim().toLowerCase()
+        if (!normalized.endsWith('@suprema.group')) {
+          return { error: 'Use seu e-mail corporativo @suprema.group' }
         }
-
-        const { data, error } = await supabase.auth.signUp({ email, password })
-        if (error) return { error: error.message }
-        if (!data.user) return { error: 'Erro ao criar conta' }
-
-        const uid = data.user.id
-        const initials = getInitials(`${profile.firstName} ${profile.lastName}`) || 'FS'
-
-        const avatarUrl = await uploadFile(uid, 'avatar', photoFile)
-
-        const row = {
-          id: uid,
-          email,
-          first_name: profile.firstName,
-          last_name: profile.lastName,
-          dept: profile.dept,
-          initials,
-          color: profile.color,
-          avatar_url: avatarUrl,
-          since: String(new Date().getFullYear()),
-        }
-        const { error: upsertErr } = await supabase.from('users').upsert(row)
-        if (upsertErr) return { error: upsertErr.message }
-
-        const mapped = mapUser({ ...row, is_admin: false, created_at: new Date().toISOString() })
-        set({
-          user: mapped,
-          isAuthenticated: true,
-          profileComplete: true,
-          isLoading: false,
+        if (isMockMode) return {}
+        const { error } = await supabase.auth.signInWithOtp({
+          email: normalized,
+          options: { shouldCreateUser: true },
         })
-        syncPredictions(uid)
-        return {}
+        return error ? { error: error.message } : {}
       },
 
-      signIn: async (email, password) => {
+      verifyOtp: async (email, token) => {
         if (isMockMode) {
           set({ user: MOCK_ME, isAuthenticated: true, profileComplete: true, isLoading: false })
+          syncPredictions(MOCK_ME.id)
           return {}
         }
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) return { error: error.message }
-        if (!data.user) return { error: 'Erro ao entrar' }
+
+        const { data, error } = await supabase.auth.verifyOtp({
+          email: email.trim().toLowerCase(),
+          token: token.trim(),
+          type: 'email',
+        })
+        if (error) return { error: 'Código inválido ou expirado.' }
+        if (!data.user) return { error: 'Erro ao validar código.' }
 
         const { data: profile } = await supabase
           .from('users').select('*').eq('id', data.user.id).single()
 
-        const user = profile ? mapUser(profile) : null
-        set({
-          user,
-          isAuthenticated: true,
-          profileComplete: !!(user?.firstName && user?.dept),
-          isLoading: false,
-        })
-        if (user?.id) syncPredictions(user.id)
+        if (profile) {
+          const user = mapUser(profile as UserRow)
+          set({
+            user,
+            isAuthenticated: true,
+            profileComplete: !!(user.firstName && user.dept),
+            isLoading: false,
+          })
+          syncPredictions(user.id)
+        } else {
+          // First login — stub until profile is completed
+          const stub: AppUser = {
+            id: data.user.id,
+            email: data.user.email ?? email,
+            firstName: '',
+            lastName: '',
+            dept: '',
+            initials: '',
+            color: '#00A651',
+            since: String(new Date().getFullYear()),
+            isAdmin: false,
+            isMarketing: false,
+            createdAt: new Date().toISOString(),
+          }
+          set({ user: stub, isAuthenticated: true, profileComplete: false, isLoading: false })
+        }
         return {}
       },
 
@@ -181,7 +163,7 @@ export const useAuthStore = create<AuthState>()(
         if (data.session?.user) {
           const { data: profile } = await supabase
             .from('users').select('*').eq('id', data.session.user.id).single()
-          const user = profile ? mapUser(profile) : null
+          const user = profile ? mapUser(profile as UserRow) : null
           set({
             user,
             isAuthenticated: true,
@@ -198,7 +180,7 @@ export const useAuthStore = create<AuthState>()(
         const uid = get().user?.id
         if (!uid || isMockMode) return
         const { data } = await supabase.from('users').select('*').eq('id', uid).single()
-        if (data) set({ user: mapUser(data) })
+        if (data) set({ user: mapUser(data as UserRow) })
       },
 
       updateProfile: async (data, photoFile, bannerFile) => {
@@ -225,6 +207,7 @@ export const useAuthStore = create<AuthState>()(
         if (!isMockMode) {
           await supabase.from('users').upsert({
             id: current.id,
+            email: current.email,
             first_name: updated.firstName,
             last_name: updated.lastName,
             dept: updated.dept,
@@ -236,6 +219,7 @@ export const useAuthStore = create<AuthState>()(
             favorite_team:       updated.favoriteTeam,
             favorite_player:     updated.favoritePlayer,
             favorite_player_img: updated.favoritePlayerImg ?? null,
+            since:               updated.since,
           })
         }
       },

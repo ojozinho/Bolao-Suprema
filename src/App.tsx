@@ -140,7 +140,7 @@ const router = createHashRouter([
   { path: '/', element: <RootRedirect /> },
   { path: '/onboarding', element: <OnboardingScreen /> },
   { path: '/login', element: <LoginScreen /> },
-  { path: '/register', element: <RegisterScreen /> },
+  { path: '/register', element: <RegisterScreen /> }, // redirects to /login
 
   // Protected routes
   {
