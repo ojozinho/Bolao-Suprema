@@ -19,6 +19,13 @@ interface GifResult {
   preview: string
 }
 
+const GIF_FALLBACKS: GifResult[] = [
+  { id: 'local-1', url: 'https://media.giphy.com/media/3o6Zt481isNVuQI1l6/giphy.gif', preview: 'https://media.giphy.com/media/3o6Zt481isNVuQI1l6/200.gif' },
+  { id: 'local-2', url: 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif', preview: 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/200.gif' },
+  { id: 'local-3', url: 'https://media.giphy.com/media/111ebonMs90YLu/giphy.gif', preview: 'https://media.giphy.com/media/111ebonMs90YLu/200.gif' },
+  { id: 'local-4', url: 'https://media.giphy.com/media/26u4cqiYI30juCOGY/giphy.gif', preview: 'https://media.giphy.com/media/26u4cqiYI30juCOGY/200.gif' },
+]
+
 async function fetchGifs(query: string): Promise<GifResult[]> {
   // Tenor v2 se tiver chave configurada
   if (TENOR_KEY) {
@@ -55,17 +62,18 @@ async function fetchGifs(query: string): Promise<GifResult[]> {
     : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=20&rating=pg-13`
   try {
     const res = await fetch(endpoint)
-    if (!res.ok) return []
+    if (!res.ok) return GIF_FALLBACKS
     const data = await res.json() as {
       data: { id: string; images: { original: { url: string }; fixed_height_small: { url: string } } }[]
     }
-    return (data.data ?? []).map(g => ({
+    const results = (data.data ?? []).map(g => ({
       id: g.id,
       url: g.images.original.url,
       preview: g.images.fixed_height_small?.url ?? g.images.original.url,
     })).filter(g => g.url)
+    return results.length > 0 ? results : GIF_FALLBACKS
   } catch {
-    return []
+    return GIF_FALLBACKS
   }
 }
 
@@ -453,7 +461,7 @@ function ChatInput({
       >
         GIF
       </button>
-      <input
+      <textarea
         value={text}
         onChange={e => setText(e.target.value)}
         onKeyDown={e => {
@@ -462,8 +470,9 @@ function ChatInput({
             handleSend()
           }
         }}
+        rows={1}
         placeholder="manda a sua..."
-        className="flex-1 bg-transparent font-sans text-[14px] outline-none placeholder:text-ink-4"
+        className="flex-1 max-h-24 resize-none bg-transparent font-sans text-[14px] leading-5 outline-none placeholder:text-ink-4 py-1"
       />
       <button
         onClick={handleSend}

@@ -97,6 +97,51 @@ function isRateLimited(): boolean {
   return false
 }
 
+// ─── Local fallback persistence ──────────────────────────────────────────────
+// GitHub Pages/dev builds often run without Supabase env vars. In that mode,
+// the chat still needs to behave like a real chat for demos: messages, GIFs,
+// polls and pins survive refresh in localStorage.
+
+const LOCAL_CHAT_KEY = 'bolao-resenha-messages-v1'
+const LOCAL_PIN_KEY = 'bolao-resenha-pinned-v1'
+
+function loadLocalMessages(myUserId?: string): ChatMessage[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(LOCAL_CHAT_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as ChatMessage[]
+    return parsed
+      .filter(Boolean)
+      .map(m => ({
+        ...m,
+        isYou: m.userId === myUserId,
+        time: m.createdAt
+          ? new Date(m.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          : m.time,
+      }))
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+  } catch {
+    return []
+  }
+}
+
+function saveLocalMessages(messages: ChatMessage[]) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(LOCAL_CHAT_KEY, JSON.stringify(messages.map(m => ({ ...m, isYou: false }))))
+}
+
+function loadLocalPin(): string | null {
+  if (typeof window === 'undefined') return null
+  return window.localStorage.getItem(LOCAL_PIN_KEY)
+}
+
+function saveLocalPin(id: string | null) {
+  if (typeof window === 'undefined') return
+  if (id) window.localStorage.setItem(LOCAL_PIN_KEY, id)
+  else window.localStorage.removeItem(LOCAL_PIN_KEY)
+}
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 interface ChatState {
@@ -131,7 +176,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     set({ _myUserId: myUserId })
 
     if (isMockMode) {
-      set({ isLoaded: true })
+      set({
+        messages: loadLocalMessages(myUserId),
+        pinnedId: loadLocalPin(),
+        isLoaded: true,
+      })
       return
     }
 
@@ -250,10 +299,15 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   addMessage: (msg) => {
     if (msg.type === 'text' && isRateLimited()) {
       console.warn('[Chat] Rate limited — mensagem descartada')
+      set({ lastError: 'Calma aí: muitas mensagens em sequência.' })
       return
     }
 
-    set(s => ({ messages: [...s.messages, msg] }))
+    set(s => {
+      const messages = [...s.messages, msg]
+      if (isMockMode) saveLocalMessages(messages)
+      return { messages }
+    })
 
     if (isMockMode) return
 
@@ -296,7 +350,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const myUserId = get()._myUserId
     set({ pinnedId: id })
 
-    if (isMockMode) return
+    if (isMockMode) {
+      saveLocalPin(id)
+      return
+    }
 
     if (id === null) {
       await supabase.from('channel_pins').delete().eq('channel_id', 'geral')
@@ -319,7 +376,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       }),
     }))
 
-    if (isMockMode) return
+    if (isMockMode) {
+      saveLocalMessages(get().messages)
+      return
+    }
 
     const { error } = await supabase.from('poll_votes').upsert(
       { message_id: msgId, user_id: userId, option_id: optionId, voted_at: new Date().toISOString() },
@@ -344,9 +404,16 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   deleteMessage: async (id) => {
     // Optimistic remove
-    set(s => ({ messages: s.messages.filter(m => m.id !== id) }))
+    set(s => {
+      const messages = s.messages.filter(m => m.id !== id)
+      if (isMockMode) saveLocalMessages(messages)
+      return { messages }
+    })
     // If this was the pinned message, unpin it
-    if (get().pinnedId === id) set({ pinnedId: null })
+    if (get().pinnedId === id) {
+      set({ pinnedId: null })
+      if (isMockMode) saveLocalPin(null)
+    }
 
     if (isMockMode) return
 

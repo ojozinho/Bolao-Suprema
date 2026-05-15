@@ -1066,7 +1066,7 @@ function TeamPickerGrid({
 
 // ─── Champion tab ─────────────────────────────────────────────────────────────
 
-const GENERAL_DEADLINE = new Date('2026-06-11T18:00:00Z')
+const GENERAL_DEADLINE = new Date('2026-06-11T19:00:00Z')
 
 function ChampionTab() {
   const { championPick, vicePick, scorerPick, setChampionPick, setVicePick, setScorerPick } = usePredictionStore()
@@ -1102,7 +1102,7 @@ function ChampionTab() {
   const isDeadlinePassed = now >= GENERAL_DEADLINE
   const allSet = championPick && vicePick && scorerPick
 
-  const deadlineStr = '11 Jun · 16:00'
+  const deadlineStr = '11 Jun · 16:00 · Horário de Brasília'
 
   return (
     <div className="px-4 py-6 pb-24">

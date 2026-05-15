@@ -60,39 +60,35 @@ function fmtMatchDate(iso: string): string {
   return `${PT_DAYS[String(day)]} ${d} ${PT_MONTHS[String(Number(m) - 1)]}`
 }
 
-// UTC offset per venue (summer 2026 DST):
-//   EDT = UTC-4 (US East Coast + Toronto)
-//   CDT = UTC-5 (US Central + Mexico)
-//   PDT = UTC-7 (US West Coast + Vancouver)
-const VENUE_UTC_OFFSET: Record<string, number> = {
-  'MetLife Stadium': -4, 'Gillette Stadium': -4, 'Lincoln Financial Field': -4,
-  'Mercedes-Benz Stadium': -4, 'Hard Rock Stadium': -4, 'BMO Field': -4,
-  'AT&T Stadium': -5, 'NRG Stadium': -5, 'Arrowhead Stadium': -5,
-  'Estadio Azteca': -5, 'Estadio Akron': -5, 'Estadio BBVA': -5,
-  'SoFi Stadium': -7, "Levi's Stadium": -7, 'Lumen Field': -7, 'BC Place': -7,
+// IMPORTANT TIMEZONE RULE
+// The raw schedule below is stored in Eastern Time (ET), following the common
+// published TV schedule format for the 2026 World Cup. During the tournament,
+// ET is EDT (UTC-4) and Brasília is BRT (UTC-3), so the user-facing time is
+// always ET + 1 hour. This keeps FIFA/TV schedule, countdowns and betting
+// deadlines using one source of truth. Example: 11 Jun 15:00 ET = 16:00 BRT.
+const RAW_SCHEDULE_UTC_OFFSET = -4
+const DISPLAY_BRT_UTC_OFFSET = -3
+
+function addHours(date: Date, hours: number): Date {
+  return new Date(date.getTime() + hours * 60 * 60 * 1000)
 }
 
-// Converts local kick-off time to BRT (UTC-3, America/Sao_Paulo).
-// BRT = UTC - 3. local + |utcOffset| = UTC.
-function toBRT(time: string, venue: string): string {
-  const utcOffset = VENUE_UTC_OFFSET[venue] ?? -4  // e.g. -4 for EDT
+function rawEtToUtc(date: string, time: string): Date {
   const [h, m] = time.split(':').map(Number)
-  // UTC = local_h - utcOffset  (utcOffset is negative, so -(−4) = +4)
-  const utcH = h - utcOffset
-  // BRT = UTC - 3
-  const brtH = ((utcH - 3) % 24 + 24) % 24
-  return `${String(brtH).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  const base = new Date(`${date}T00:00:00Z`)
+  base.setUTCHours(h - RAW_SCHEDULE_UTC_OFFSET, m, 0, 0)
+  return base
+}
+
+function toBRT(date: string, time: string): string {
+  const utc = rawEtToUtc(date, time)
+  const brt = addHours(utc, DISPLAY_BRT_UTC_OFFSET)
+  return brt.toISOString().slice(11, 16)
 }
 
 // Returns ISO 8601 UTC timestamp for kick-off (for deadline/auto-close logic).
-function toKickoffUtc(date: string, time: string, venue: string): string {
-  const utcOffset = VENUE_UTC_OFFSET[venue] ?? -4
-  const [h, m] = time.split(':').map(Number)
-  const utcH = h - utcOffset  // convert local → UTC
-  // Build a valid date. If utcH >= 24 it rolls to the next day.
-  const base = new Date(`${date}T00:00:00Z`)
-  base.setUTCHours(utcH, m, 0, 0)
-  return base.toISOString()
+function toKickoffUtc(date: string, time: string): string {
+  return rawEtToUtc(date, time).toISOString()
 }
 
 // ─── Raw match schedule — all 72 group stage matches ─────────────────────────
@@ -221,8 +217,8 @@ export function resolveMatch(r: RawMatch): Match {
     homeScore: r.homeScore ?? null,
     awayScore: r.awayScore ?? null,
     date: fmtMatchDate(r.date),
-    time: toBRT(r.time, r.venue),
-    kickoffUtc: toKickoffUtc(r.date, r.time, r.venue),
+    time: toBRT(r.date, r.time),
+    kickoffUtc: toKickoffUtc(r.date, r.time),
     venue: `${r.venue} · ${r.city}`,
     status: r.status,
     liveMinute: r.liveMinute,
