@@ -459,6 +459,9 @@ function AdminOpsPanel() {
               <div key={String(p.id)} className="border border-hairline p-2">
                 <div className="font-mono text-[10px] font-bold truncate">{String(p.first_name ?? '')} {String(p.last_name ?? '')}</div>
                 <div className="font-mono text-[8px] text-ink-4 truncate">{String(p.participant_status ?? 'active')} · {String(p.user_role ?? 'user')}</div>
+                {p.invite_code && (
+                  <div className="font-mono text-[8px] text-ink-4 truncate">convite {String(p.invite_code)}</div>
+                )}
                 <div className="flex gap-1 mt-2">
                   {(['active','blocked','removed'] as ParticipantStatus[]).map(status => (
                     <button key={status} disabled={busy} onClick={() => setParticipant(p.id, status)} className="font-mono text-[8px] border border-hairline px-1.5 py-1 hover:bg-yellow">{status}</button>

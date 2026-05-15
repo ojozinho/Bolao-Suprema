@@ -32,6 +32,8 @@ export interface AppUser {
   isOwner?: boolean
   userRole?: UserRole
   participantStatus?: ParticipantStatus
+  inviteCode?: string | null
+  inviteRedeemedAt?: string | null
   privacyHideEmail?: boolean
   privacyHideProfile?: boolean
   createdAt: string

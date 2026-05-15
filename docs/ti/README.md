@@ -91,6 +91,7 @@ Aplicadas nesta onda:
 - `20260515170000_add_product_write_rpcs.sql`
 - `20260515171500_harden_product_write_rpc_grants.sql`
 - `20260515173000_harden_audit_trigger_functions.sql`
+- `20260515180000_add_invite_redemption_flow.sql`
 
 Os writes criticos de produto devem passar por RPCs auditadas:
 
@@ -98,6 +99,7 @@ Os writes criticos de produto devem passar por RPCs auditadas:
 - `save_general_picks`: salva campeao/vice/artilheiro com validacao de prazo e chaveamento.
 - `save_bracket_pick` / `delete_bracket_pick`: salvam chave respeitando locks por fase.
 - `create_participant_invite`: cria convite somente para admin.
+- `redeem_participant_invite`: registra resgate de convite por usuario autenticado, sem aprovar automaticamente.
 - `save_scoring_rule`: altera regra de pontuacao somente para admin.
 
 `log_audit` nao deve ser chamado diretamente pelo frontend. Triggers e RPCs gravam auditoria no banco.
@@ -119,6 +121,7 @@ Nunca apagar tabelas/buckets antigos sem confirmacao. Para rollback rapido, reve
 
 - Usuario solicita OTP com e-mail corporativo.
 - Novo usuario entra pendente.
+- Link de convite em `/#/login?invite=CODIGO` registra o convite apos OTP e mantem o usuario pendente.
 - Admin aprova participante.
 - Usuario completa perfil, palpita e acompanha ranking.
 - Admin bloqueia/desbloqueia mercados e apura resultados.

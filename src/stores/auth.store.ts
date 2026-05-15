@@ -6,6 +6,7 @@ import { MOCK_ME } from '@/data/mock'
 import { getInitials } from '@/lib/utils'
 import { usePredictionStore } from './prediction.store'
 import { useBracketStore } from './bracket.store'
+import { redeemParticipantInvite } from '@/services/product'
 
 function syncUserStores(userId: string) {
   const preds = usePredictionStore.getState()
@@ -29,6 +30,8 @@ interface UserRow {
   since: string; is_admin: boolean; is_marketing: boolean; is_owner?: boolean
   user_role?: 'user' | 'marketing' | 'admin' | 'owner'
   participant_status?: 'pending' | 'active' | 'blocked' | 'removed'
+  invite_code?: string | null
+  invite_redeemed_at?: string | null
   privacy_hide_email?: boolean; privacy_hide_profile?: boolean
   created_at: string
 }
@@ -54,6 +57,8 @@ function mapUser(row: UserRow): AppUser {
     isOwner:           row.is_owner ?? false,
     userRole:          row.user_role ?? (row.is_admin ? 'admin' : row.is_marketing ? 'marketing' : 'user'),
     participantStatus: row.participant_status ?? 'active',
+    inviteCode:        row.invite_code ?? null,
+    inviteRedeemedAt:  row.invite_redeemed_at ?? null,
     privacyHideEmail:  row.privacy_hide_email ?? true,
     privacyHideProfile: row.privacy_hide_profile ?? false,
     createdAt:         row.created_at  ?? new Date().toISOString(),
@@ -72,7 +77,7 @@ interface AuthState {
   setUser: (user: AppUser | null) => void
   setRememberMe: (v: boolean) => void
   sendOtp: (email: string) => Promise<{ error?: string }>
-  verifyOtp: (email: string, token: string) => Promise<{ error?: string }>
+  verifyOtp: (email: string, token: string, inviteCode?: string | null) => Promise<{ error?: string; warning?: string }>
   signOut: () => Promise<void>
   loadSession: () => Promise<void>
   updateProfile: (data: Partial<AppUser>, photoFile?: File, bannerFile?: File) => Promise<void>
@@ -121,7 +126,7 @@ export const useAuthStore = create<AuthState>()(
         return {}
       },
 
-      verifyOtp: async (email, token) => {
+      verifyOtp: async (email, token, inviteCode) => {
         if (isExplicitMockMode) {
           set({ user: MOCK_ME, isAuthenticated: true, profileComplete: true, isLoading: false })
           syncUserStores(MOCK_ME.id)
@@ -143,6 +148,13 @@ export const useAuthStore = create<AuthState>()(
           sessionStorage.setItem('bolao-session', data.user.id)
         }
 
+        let inviteWarning: string | undefined
+        const normalizedInvite = inviteCode?.trim().toUpperCase()
+        if (normalizedInvite) {
+          const invite = await redeemParticipantInvite(normalizedInvite)
+          if (invite.error) inviteWarning = invite.error
+        }
+
         const { data: profile } = await supabase
           .from('users').select('*').eq('id', data.user.id).single()
 
@@ -155,6 +167,7 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
           })
           syncUserStores(user.id)
+          if (inviteWarning) return { warning: inviteWarning }
         } else {
           const stub: AppUser = {
             id: data.user.id,
@@ -176,7 +189,7 @@ export const useAuthStore = create<AuthState>()(
           }
           set({ user: stub, isAuthenticated: true, profileComplete: false, isLoading: false })
         }
-        return {}
+        return inviteWarning ? { warning: inviteWarning } : {}
       },
 
       signOut: async () => {

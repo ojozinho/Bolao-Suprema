@@ -1,5 +1,5 @@
 import { useState, useEffect, KeyboardEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Logo } from '@/components/shared/Logo'
 import { TourneyMark } from '@/components/shared/TourneyMark'
@@ -14,11 +14,14 @@ type Step = 'email' | 'code'
 function useOtpFlow() {
   const { sendOtp, verifyOtp, rememberMe, setRememberMe } = useAuthStore()
   const navigate = useNavigate()
+  const { search } = useLocation()
+  const inviteCode = new URLSearchParams(search).get('invite')?.trim().toUpperCase() ?? ''
 
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
+  const [warning, setWarning] = useState('')
   const [loading, setLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
 
@@ -50,12 +53,14 @@ function useOtpFlow() {
     if (!codeComplete || loading) return
     setLoading(true)
     setError('')
-    const res = await verifyOtp(email.trim(), code)
+    setWarning('')
+    const res = await verifyOtp(email.trim(), code, inviteCode || null)
     setLoading(false)
     if (res.error) {
       setError(res.error)
       setCode('')
     } else {
+      if (res.warning) setWarning(res.warning)
       navigate('/home', { replace: true })
     }
   }
@@ -74,11 +79,12 @@ function useOtpFlow() {
     setStep('email')
     setCode('')
     setError('')
+    setWarning('')
   }
 
   return {
     step, email, setEmail, code, setCode,
-    error, loading, canSendEmail, codeComplete,
+    error, warning, inviteCode, loading, canSendEmail, codeComplete,
     resendCooldown, rememberMe, setRememberMe,
     handleSendOtp, handleVerify, handleResend, handleBack,
   }
@@ -166,6 +172,13 @@ function LoginMobile() {
               <p className="font-serif-it text-yellow text-lg mb-8">
                 só pra galera da firma
               </p>
+
+              {f.inviteCode && (
+                <div className="mb-4 border border-yellow/40 bg-yellow/10 px-3 py-2">
+                  <p className="font-mono text-[9px] tracking-eyebrow text-yellow">CONVITE DETECTADO</p>
+                  <p className="font-mono text-[11px] text-paper/70">Codigo {f.inviteCode}. Seu cadastro fica pendente ate aprovacao.</p>
+                </div>
+              )}
 
               <div className="mb-3">
                 <p className="font-mono text-[9px] tracking-eyebrow text-paper/50 mb-1.5">
@@ -324,6 +337,13 @@ function LoginDesktop() {
               <p className="font-serif-it text-green-deep text-xl mb-8">
                 só pra galera da Suprema
               </p>
+
+              {f.inviteCode && (
+                <div className="mb-5 border border-yellow/50 bg-yellow/10 px-3 py-2">
+                  <p className="font-mono text-[9px] tracking-eyebrow text-ink-4">CONVITE DETECTADO</p>
+                  <p className="font-mono text-[11px] text-ink-3">Codigo {f.inviteCode}. O admin ainda precisa aprovar sua participacao.</p>
+                </div>
+              )}
 
               <div className="mb-4">
                 <p className="font-mono text-[9px] tracking-eyebrow text-ink-4 mb-1.5">

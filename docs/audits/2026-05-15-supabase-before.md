@@ -78,6 +78,7 @@ The applied migrations are additive and are also committed as:
 - `supabase/migrations/20260515170000_add_product_write_rpcs.sql`
 - `supabase/migrations/20260515171500_harden_product_write_rpc_grants.sql`
 - `supabase/migrations/20260515173000_harden_audit_trigger_functions.sql`
+- `supabase/migrations/20260515180000_add_invite_redemption_flow.sql`
 
 They do not drop tables, buckets, columns or legacy storage objects. They keep `user-media` renderable for old URLs, add new buckets for future uploads, remove broad storage listing policies, restrict RPC execution grants, add indexes for the new foreign keys, replace the broad `users_select_all` policy with profile privacy enforcement, and move critical product writes to audited RPCs.
 
@@ -87,6 +88,7 @@ Critical write RPCs added in the final hardening pass:
 - `save_general_picks`: rejects non-active participants, late general picks, identical champion/vice, and impossible same-group champion/vice combinations.
 - `save_bracket_pick` and `delete_bracket_pick`: reject non-active participants and locked bracket rounds.
 - `create_participant_invite`: admin-only invite creation.
+- `redeem_participant_invite`: authenticated invite redemption that records usage once per user, keeps the user pending for admin approval, inserts an in-app notification, and audits the redemption.
 - `save_scoring_rule`: admin-only scoring rule changes.
 
 `log_audit` remains private to `postgres`/`service_role`; trigger functions `audit_prediction_change` and `audit_profile_update` now run as `SECURITY DEFINER` and are not directly executable by `anon` or `authenticated`.

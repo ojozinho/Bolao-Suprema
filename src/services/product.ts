@@ -149,7 +149,7 @@ export async function fetchParticipants() {
   if (isMockMode) return ok([])
   const { data, error } = await supabase
     .from('users')
-    .select('id,email,first_name,last_name,dept,initials,color,avatar_url,is_admin,is_marketing,is_owner,user_role,participant_status,created_at,approved_at,blocked_at,removed_at')
+    .select('id,email,first_name,last_name,dept,initials,color,avatar_url,is_admin,is_marketing,is_owner,user_role,participant_status,invite_code,invite_redeemed_at,created_at,approved_at,blocked_at,removed_at')
     .order('created_at', { ascending: false })
   if (error) return fail(error.message)
   return ok(data ?? [])
@@ -292,6 +292,16 @@ export async function createInvite(label = 'Convite Bolao Suprema') {
     isActive: data.is_active,
     createdAt: data.created_at,
   })
+}
+
+export async function redeemParticipantInvite(code: string): Promise<ServiceResult<AppUser>> {
+  const blocked = requireSupabase()
+  if (blocked) return fail<AppUser>(blocked)
+  const { data, error } = await supabase.rpc('redeem_participant_invite', {
+    p_code: code,
+  })
+  if (error) return fail(error.message)
+  return ok(data as AppUser)
 }
 
 export async function fetchNotifications(userId: string): Promise<ServiceResult<Notification[]>> {
