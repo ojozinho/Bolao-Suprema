@@ -11,6 +11,7 @@ import type { ChatMessage, ChatPoll } from '@/types'
 // ─── Tenor GIF API ─────────────────────────────────────────────────────────────
 
 const TENOR_KEY = import.meta.env.VITE_TENOR_KEY as string | undefined
+const GIPHY_KEY = 'dc6zaTOxFJmzC' // public beta key (fallback gratuito)
 
 interface GifResult {
   id: string
@@ -19,27 +20,49 @@ interface GifResult {
 }
 
 async function fetchGifs(query: string): Promise<GifResult[]> {
-  if (!TENOR_KEY) return []
-  const params = new URLSearchParams({
-    key: TENOR_KEY,
-    client_key: 'bolao_suprema',
-    limit: '20',
-    contentfilter: 'medium',
-    media_filter: 'gif,tinygif',
-  })
-  if (query.trim()) params.set('q', query.trim())
-  const base = 'https://tenor.googleapis.com/v2'
-  const endpoint = query.trim() ? `${base}/search?${params}` : `${base}/featured?${params}`
+  // Tenor v2 se tiver chave configurada
+  if (TENOR_KEY) {
+    const params = new URLSearchParams({
+      key: TENOR_KEY,
+      client_key: 'bolao_suprema',
+      limit: '20',
+      contentfilter: 'medium',
+      media_filter: 'gif,tinygif',
+    })
+    if (query.trim()) params.set('q', query.trim())
+    const base = 'https://tenor.googleapis.com/v2'
+    const endpoint = query.trim() ? `${base}/search?${params}` : `${base}/featured?${params}`
+    try {
+      const res = await fetch(endpoint)
+      if (res.ok) {
+        const data = await res.json() as {
+          results: { id: string; media_formats: { gif?: { url: string }; tinygif?: { url: string } } }[]
+        }
+        const gifs = (data.results ?? []).map(r => ({
+          id: r.id,
+          url: r.media_formats.gif?.url ?? '',
+          preview: r.media_formats.tinygif?.url ?? r.media_formats.gif?.url ?? '',
+        })).filter(g => g.url)
+        if (gifs.length > 0) return gifs
+      }
+    } catch { /* fallthrough to Giphy */ }
+  }
+
+  // Giphy como provedor padrão
+  const q = query.trim()
+  const endpoint = q
+    ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(q)}&limit=20&rating=pg-13`
+    : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=20&rating=pg-13`
   try {
     const res = await fetch(endpoint)
     if (!res.ok) return []
     const data = await res.json() as {
-      results: { id: string; media_formats: { gif?: { url: string }; tinygif?: { url: string } } }[]
+      data: { id: string; images: { original: { url: string }; fixed_height_small: { url: string } } }[]
     }
-    return (data.results ?? []).map(r => ({
-      id: r.id,
-      url: r.media_formats.gif?.url ?? '',
-      preview: r.media_formats.tinygif?.url ?? r.media_formats.gif?.url ?? '',
+    return (data.data ?? []).map(g => ({
+      id: g.id,
+      url: g.images.original.url,
+      preview: g.images.fixed_height_small?.url ?? g.images.original.url,
     })).filter(g => g.url)
   } catch {
     return []
@@ -95,12 +118,7 @@ function GifPicker({ onSelect, onClose }: { onSelect: (url: string) => void; onC
         </button>
       </div>
       <div className="h-[calc(300px-44px)] overflow-y-auto overscroll-contain">
-        {!TENOR_KEY ? (
-          <div className="flex flex-col items-center justify-center h-full gap-2 px-4 text-center">
-            <span className="font-mono text-[11px] text-ink-3">GIFs desabilitados</span>
-            <span className="font-mono text-[9px] text-ink-4 leading-relaxed">Adicione VITE_TENOR_KEY nas variáveis de ambiente do projeto (GitHub Secrets)</span>
-          </div>
-        ) : loading ? (
+        {loading ? (
           <div className="flex items-center justify-center h-full">
             <span className="font-mono text-[11px] text-ink-3 animate-pulse">CARREGANDO...</span>
           </div>

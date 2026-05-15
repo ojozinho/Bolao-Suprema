@@ -62,6 +62,34 @@ function apiRequest(method, apiPath, body) {
   })
 }
 
+// Helper para chamar a API de storage do próprio projeto (usa service_role key)
+function storageRequest(method, path, serviceKey, body) {
+  return new Promise((resolve, reject) => {
+    const payload = body ? JSON.stringify(body) : null
+    const opts = {
+      hostname: `${PROJECT_REF}.supabase.co`,
+      path:     `/storage/v1${path}`,
+      method,
+      headers: {
+        'Authorization': `Bearer ${serviceKey}`,
+        'Content-Type':  'application/json',
+        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
+      },
+    }
+    const req = https.request(opts, res => {
+      let raw = ''
+      res.on('data', c => raw += c)
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(raw) })
+        } catch { resolve({ status: res.statusCode, body: raw }) }
+      })
+    })
+    req.on('error', reject)
+    if (payload) req.write(payload)
+    req.end()
+  })
+}
+
 // ─── SQL em blocos menores (evita timeout) ───────────────────────────────────
 
 async function runSQL(label, sql) {
@@ -472,19 +500,31 @@ async function main() {
 
   // ── 3. Criar bucket de storage ────────────────────────────────────────────
   console.log('③ Criando bucket de storage…')
-  const bucketRes = await apiRequest('POST', `/v1/projects/${PROJECT_REF}/storage/buckets`, {
-    id: 'user-media',
-    name: 'user-media',
-    public: true,
-    file_size_limit: 5242880, // 5MB
-    allowed_mime_types: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
-  })
-  if (bucketRes.status === 200 || bucketRes.status === 201) {
-    console.log('  ▸ Bucket user-media criado ✓')
-  } else if (bucketRes.status === 409 || (typeof bucketRes.body === 'object' && JSON.stringify(bucketRes.body).includes('already exists'))) {
-    console.log('  ▸ Bucket user-media já existe ✓')
+  // Busca o service_role key via Management API para poder criar o bucket
+  const keysRes = await apiRequest('GET', `/v1/projects/${PROJECT_REF}/api-keys`)
+  const serviceKey = Array.isArray(keysRes.body)
+    ? keysRes.body.find(k => k.name === 'service_role')?.api_key
+    : null
+
+  if (!serviceKey) {
+    console.log('  ⚠️  Não foi possível obter service_role key — crie o bucket manualmente:')
+    console.log(`     https://supabase.com/dashboard/project/${PROJECT_REF}/storage/buckets`)
+    console.log('     Nome: user-media | Público: sim')
   } else {
-    console.log('  ⚠️  Bucket (ignorar se já existe):', JSON.stringify(bucketRes.body))
+    const bucketRes = await storageRequest('POST', '/bucket', serviceKey, {
+      id: 'user-media',
+      name: 'user-media',
+      public: true,
+      file_size_limit: 5242880,
+      allowed_mime_types: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+    })
+    if (bucketRes.status === 200 || bucketRes.status === 201) {
+      console.log('  ▸ Bucket user-media criado ✓')
+    } else if (bucketRes.status === 409 || JSON.stringify(bucketRes.body).includes('already exist')) {
+      console.log('  ▸ Bucket user-media já existe ✓')
+    } else {
+      console.log('  ⚠️  Bucket:', JSON.stringify(bucketRes.body))
+    }
   }
   console.log()
 
