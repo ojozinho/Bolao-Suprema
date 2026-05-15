@@ -298,7 +298,6 @@ function TextBubble({ m }: { m: ChatMessage }) {
         {m.reaction && (
           <div className="flex items-center gap-1 border border-hairline px-2 py-0.5 rounded-full text-[12px]">
             <span>{m.reaction}</span>
-            <span className="font-mono text-[10px] text-ink-3">12</span>
           </div>
         )}
       </div>

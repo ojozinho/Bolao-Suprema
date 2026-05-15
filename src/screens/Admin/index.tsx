@@ -242,8 +242,8 @@ function MatchRowAdmin({
 
         {/* Actions */}
         {!busy && (
-          <div className="flex gap-1 flex-shrink-0">
-            {(currentStatus === 'scheduled') && (
+          <div className="flex gap-1 flex-shrink-0 flex-wrap">
+            {currentStatus === 'scheduled' && (
               <button
                 onClick={() => handleStatusChange('open')}
                 className="btn-ghost text-[9px] px-2 py-1"
@@ -252,13 +252,22 @@ function MatchRowAdmin({
                 ABRIR
               </button>
             )}
-            {(currentStatus === 'open') && (
+            {currentStatus === 'open' && (
               <button
                 onClick={() => handleStatusChange('locked')}
                 className="btn-ghost text-[9px] px-2 py-1 border-yellow/60"
                 title="Bloquear apostas"
               >
                 BLOQUEAR
+              </button>
+            )}
+            {currentStatus === 'locked' && (
+              <button
+                onClick={() => handleStatusChange('open')}
+                className="btn-ghost text-[9px] px-2 py-1 border-green/60 text-green"
+                title="Reabrir apostas"
+              >
+                REABRIR
               </button>
             )}
             {(currentStatus === 'locked' || currentStatus === 'live') && (
@@ -268,6 +277,15 @@ function MatchRowAdmin({
                 title="Registrar resultado"
               >
                 RESULTADO
+              </button>
+            )}
+            {currentStatus === 'finished' && (
+              <button
+                onClick={() => handleStatusChange('open')}
+                className="btn-ghost text-[9px] px-2 py-1 border-green/60 text-green"
+                title="Reabrir para correção"
+              >
+                REABRIR
               </button>
             )}
             {currentStatus === 'finished' && (

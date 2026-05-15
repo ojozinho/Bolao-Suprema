@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuthStore } from '@/stores/auth.store'
 import { useBoletimStore } from '@/stores/boletim.store'
+import { uploadFile, isMockMode } from '@/lib/supabase'
 import type { Boletim } from '@/types'
 
 // ─── Label colour map ─────────────────────────────────────────────────────────
@@ -77,7 +78,9 @@ function BoletimCard({
         </div>
 
         {b.imageUrl && (
-          <img src={b.imageUrl} alt={b.title} className="w-full h-48 object-cover mb-4 opacity-80" />
+          <div className="w-full overflow-hidden mb-4 opacity-90" style={{ paddingBottom: '56.25%', position: 'relative' }}>
+            <img src={b.imageUrl} alt={b.title} className="absolute inset-0 w-full h-full object-contain bg-ink/20" />
+          </div>
         )}
 
         <p className="font-sans text-[14px] text-paper/80 leading-relaxed">{b.body}</p>
@@ -127,7 +130,9 @@ function BoletimCard({
           >
             <div className="px-4 pb-4 border-t border-hairline pt-3">
               {b.imageUrl && (
-                <img src={b.imageUrl} alt={b.title} className="w-full h-36 object-cover mb-3" />
+                <div className="w-full overflow-hidden mb-3" style={{ paddingBottom: '56.25%', position: 'relative' }}>
+                  <img src={b.imageUrl} alt={b.title} className="absolute inset-0 w-full h-full object-contain bg-paper-deep" />
+                </div>
               )}
               <p className="font-sans text-[13px] text-ink-2 leading-relaxed">{b.body}</p>
               {canEdit && (
@@ -173,9 +178,35 @@ function CreateModal({
   const [subtitle, setSubtitle] = useState('')
   const [body, setBody] = useState('')
   const [imageUrl, setImageUrl] = useState('')
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const valid = title.trim().length > 0 && body.trim().length > 0
+
+  async function handleImageFile(file: File) {
+    setUploadError(null)
+    if (file.size > 8 * 1024 * 1024) {
+      setUploadError('Imagem muito grande. Máximo: 8 MB.')
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Arquivo inválido. Use JPG, PNG ou WEBP.')
+      return
+    }
+    setImagePreview(URL.createObjectURL(file))
+    if (isMockMode || !user?.id) return
+    setUploading(true)
+    const url = await uploadFile(user.id, `boletim-${Date.now()}`, file)
+    setUploading(false)
+    if (url) {
+      setImageUrl(url)
+    } else {
+      setUploadError('Erro ao fazer upload. Tente novamente.')
+    }
+  }
 
   const handleCreate = async () => {
     if (!valid) return
@@ -185,7 +216,7 @@ function CreateModal({
       title:      title.trim(),
       subtitle:   subtitle.trim() || undefined,
       body:       body.trim(),
-      imageUrl:   imageUrl.trim() || undefined,
+      imageUrl:   imageUrl || undefined,
       authorId:   user?.id   ?? 'admin',
       authorName: user ? `${user.firstName} ${user.lastName}` : 'Admin',
       isPinned:   false,
@@ -256,12 +287,63 @@ function CreateModal({
             rows={4}
             className="w-full bg-paper-deep border border-line px-3 py-2.5 font-sans text-[14px] outline-none focus:border-ink placeholder:text-ink-4 resize-none"
           />
-          <input
-            value={imageUrl}
-            onChange={e => setImageUrl(e.target.value)}
-            placeholder="URL da imagem (opcional)"
-            className="w-full bg-paper-deep border border-line px-3 py-2.5 font-mono text-[12px] outline-none focus:border-ink placeholder:text-ink-4"
-          />
+          {/* Image upload */}
+          <div>
+            <p className="font-mono text-[9px] tracking-eyebrow text-ink-3 mb-1.5">
+              IMAGEM (opcional) — proporção ideal 16:9 · máx. 8 MB
+            </p>
+
+            {imagePreview ? (
+              <div className="relative">
+                {/* 16:9 preview */}
+                <div className="relative w-full overflow-hidden bg-paper-deep" style={{ paddingBottom: '56.25%' }}>
+                  <img
+                    src={imagePreview}
+                    alt="preview"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  {uploading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-ink/40">
+                      <span className="font-mono text-[10px] text-paper animate-pulse">ENVIANDO…</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-1.5">
+                  {imageUrl
+                    ? <span className="font-mono text-[9px] text-green">✓ Upload concluído</span>
+                    : uploadError
+                      ? <span className="font-mono text-[9px] text-red">{uploadError}</span>
+                      : <span className="font-mono text-[9px] text-ink-3 animate-pulse">Enviando…</span>
+                  }
+                  <button
+                    type="button"
+                    onClick={() => { setImagePreview(null); setImageUrl(''); setUploadError(null) }}
+                    className="ml-auto font-mono text-[9px] text-ink-4 hover:text-ink"
+                  >
+                    REMOVER ✕
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-line hover:border-ink transition-colors py-6 flex flex-col items-center gap-1.5"
+              >
+                <span className="font-mono text-[20px] text-ink-4">↑</span>
+                <span className="font-mono text-[10px] text-ink-3">Clique para selecionar imagem</span>
+                <span className="font-mono text-[8px] text-ink-4">JPG · PNG · WEBP · máx. 8 MB</span>
+              </button>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile(f) }}
+            />
+          </div>
         </div>
 
         <div className="flex gap-3 mt-6">

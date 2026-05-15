@@ -14,6 +14,8 @@ import { fmtPts, cn } from '@/lib/utils'
 import { fetchRanking } from '@/lib/ranking'
 import { fetchFeaturedVideos } from '@/lib/scorebat'
 import type { ScorebatVideo } from '@/lib/scorebat'
+import { fetchFootballImages, FOOTBALL_FALLBACKS } from '@/lib/footballimages'
+import type { FootballImage } from '@/lib/footballimages'
 import { fetchWC26News, isConfigured as newsConfigured } from '@/lib/footballnews'
 import type { FootballNewsItem } from '@/lib/footballnews'
 import type { RankingEntry, Match } from '@/types'
@@ -374,71 +376,91 @@ function WC26News({ compact = false }: { compact?: boolean }) {
   )
 }
 
-function RotatingHero({ days, children }: { days: number; children?: React.ReactNode }) {
-  const [idx, setIdx] = useState(0)
-  const [bgPhotos, setBgPhotos] = useState<string[]>([])
+function useHeroImages() {
+  const [images, setImages] = useState<FootballImage[]>(FOOTBALL_FALLBACKS)
 
   useEffect(() => {
+    // Try Scorebat thumbnails first (fastest, match photos)
     fetchFeaturedVideos().then(vids => {
-      const thumbs = vids.filter(v => v.thumbnail).slice(0, 10).map(v => v.thumbnail)
-      setBgPhotos(thumbs)
+      const scorebatImgs = vids
+        .filter(v => v.thumbnail)
+        .slice(0, 10)
+        .map(v => ({ url: v.thumbnail, alt: v.title }))
+      if (scorebatImgs.length >= 4) {
+        setImages(scorebatImgs)
+        return
+      }
+      // Fallback: Pexels or curated
+      fetchFootballImages().then(imgs => {
+        if (imgs.length > 0) setImages(imgs)
+      })
+    }).catch(() => {
+      fetchFootballImages().then(imgs => { if (imgs.length > 0) setImages(imgs) })
     })
   }, [])
 
+  return images
+}
+
+function RotatingHero({ days, children }: { days: number; children?: React.ReactNode }) {
+  const [idx, setIdx] = useState(0)
+  const heroImages = useHeroImages()
+
   useEffect(() => {
-    const total = Math.max(HERO_THEMES.length, bgPhotos.length || HERO_THEMES.length)
-    const id = setInterval(() => setIdx(i => (i + 1) % total), 4500)
+    const total = Math.max(HERO_THEMES.length, heroImages.length)
+    const id = setInterval(() => setIdx(i => (i + 1) % total), 5000)
     return () => clearInterval(id)
-  }, [bgPhotos.length])
+  }, [heroImages.length])
 
   const theme = HERO_THEMES[idx % HERO_THEMES.length]
   const team = TEAMS[theme.code]
-  const bgPhoto = bgPhotos[idx % (bgPhotos.length || 1)]
+  const bgImage = heroImages[idx % heroImages.length]
 
   return (
-    <section className="relative overflow-hidden" style={{ height: 280 }}>
-      {/* Background photo — Scorebat thumbnail or fallback */}
+    <section className="relative overflow-hidden" style={{ height: 300 }}>
+      {/* Background photo */}
       <AnimatePresence mode="wait">
         <motion.div
           key={`bg-${idx}`}
-          initial={{ opacity: 0, scale: 1.05 }}
+          initial={{ opacity: 0, scale: 1.06 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 1.4 }}
+          transition={{ duration: 1.6, ease: 'easeOut' }}
           className="absolute inset-0"
         >
-          {bgPhoto
-            ? <img src={bgPhoto} alt="" className="w-full h-full object-cover" />
+          {bgImage
+            ? <img src={bgImage.url} alt={bgImage.alt} className="w-full h-full object-cover" />
             : <div className="w-full h-full bg-ink" />
           }
         </motion.div>
       </AnimatePresence>
 
-      {/* Animated color overlay */}
+      {/* Color overlay — national team colours */}
       <AnimatePresence mode="wait">
         <motion.div
           key={`color-${idx}`}
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          animate={{ opacity: 0.75 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 1.2 }}
           className="absolute inset-0"
-          style={{ background: `linear-gradient(135deg, ${theme.c1}DD 0%, ${theme.c2}99 100%)` }}
+          style={{ background: `linear-gradient(135deg, ${theme.c1}EE 0%, ${theme.c2}AA 100%)` }}
         />
       </AnimatePresence>
 
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-ink/80" />
+      {/* Depth gradient */}
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-ink/10 to-ink/90" />
 
-      {/* Team badge pill */}
+      {/* Team badge */}
       <AnimatePresence mode="wait">
         {team && (
           <motion.div
             key={`badge-${idx}`}
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 16 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.5 }}
-            className="absolute top-4 right-4 flex items-center gap-2 bg-ink/50 backdrop-blur-sm px-3 py-1.5"
+            exit={{ opacity: 0, x: -16 }}
+            transition={{ duration: 0.45 }}
+            className="absolute top-4 right-4 flex items-center gap-2 bg-ink/60 backdrop-blur-sm px-3 py-1.5 border border-paper/10"
           >
             <Flag team={team} size={18} className="rounded-none" />
             <span className="font-mono text-[10px] text-paper tracking-eyebrow font-bold">{theme.label}</span>
@@ -446,12 +468,23 @@ function RotatingHero({ days, children }: { days: number; children?: React.React
         )}
       </AnimatePresence>
 
+      {/* Slide dots */}
+      <div className="absolute bottom-[72px] left-0 right-0 flex justify-center gap-1">
+        {heroImages.slice(0, 8).map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setIdx(i)}
+            className={cn('w-1 h-1 rounded-full transition-all', i === idx % 8 ? 'bg-yellow w-4' : 'bg-paper/30')}
+          />
+        ))}
+      </div>
+
       {/* Countdown */}
-      <div className="absolute inset-0 flex flex-col items-center justify-end pb-6 px-4 text-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-end pb-8 px-4 text-center">
         <div className="font-mono text-[10px] tracking-eyebrow text-paper/60 mb-1">
           COPA DO MUNDO 2026 · FASE DE GRUPOS
         </div>
-        <div className="font-display text-[80px] leading-none text-paper">{days}</div>
+        <div className="font-display text-[80px] leading-none text-paper drop-shadow-lg">{days}</div>
         <div className="font-display text-2xl text-paper/70 -mt-1">DIAS</div>
         <div className="font-serif-it text-sm text-yellow mt-1">para a bola rolar · 11 Jun · 17:00</div>
       </div>
@@ -502,37 +535,31 @@ export function HomeScreen() {
 
 function RotatingHeroDesktop({ days, onCta }: { days: number; onCta: () => void }) {
   const [idx, setIdx] = useState(0)
-  const [bgPhotos, setBgPhotos] = useState<string[]>([])
+  const heroImages = useHeroImages()
 
   useEffect(() => {
-    fetchFeaturedVideos().then(vids => {
-      setBgPhotos(vids.filter(v => v.thumbnail).slice(0, 10).map(v => v.thumbnail))
-    })
-  }, [])
-
-  useEffect(() => {
-    const total = Math.max(HERO_THEMES.length, bgPhotos.length || HERO_THEMES.length)
-    const id = setInterval(() => setIdx(i => (i + 1) % total), 4500)
+    const total = Math.max(HERO_THEMES.length, heroImages.length)
+    const id = setInterval(() => setIdx(i => (i + 1) % total), 5000)
     return () => clearInterval(id)
-  }, [bgPhotos.length])
+  }, [heroImages.length])
 
   const theme = HERO_THEMES[idx % HERO_THEMES.length]
   const team = TEAMS[theme.code]
-  const bgPhoto = bgPhotos[idx % (bgPhotos.length || 1)]
+  const bgImage = heroImages[idx % heroImages.length]
 
   return (
     <div className="relative overflow-hidden min-h-[340px] border-2 border-ink">
       <AnimatePresence mode="wait">
         <motion.div
           key={`dbg-${idx}`}
-          initial={{ opacity: 0, scale: 1.05 }}
+          initial={{ opacity: 0, scale: 1.06 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 1.4 }}
+          transition={{ duration: 1.6, ease: 'easeOut' }}
           className="absolute inset-0"
         >
-          {bgPhoto
-            ? <img src={bgPhoto} alt="" className="w-full h-full object-cover" />
+          {bgImage
+            ? <img src={bgImage.url} alt={bgImage.alt} className="w-full h-full object-cover" />
             : <div className="w-full h-full bg-ink" />
           }
         </motion.div>
@@ -541,14 +568,14 @@ function RotatingHeroDesktop({ days, onCta }: { days: number; onCta: () => void 
         <motion.div
           key={`dcolor-${idx}`}
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          animate={{ opacity: 0.75 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 1.2 }}
           className="absolute inset-0"
-          style={{ background: `linear-gradient(135deg, ${theme.c1}DD 0%, ${theme.c2}88 100%)` }}
+          style={{ background: `linear-gradient(135deg, ${theme.c1}EE 0%, ${theme.c2}AA 100%)` }}
         />
       </AnimatePresence>
-      <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/20 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-ink/10 to-ink/90" />
 
       {/* Team pill top-right */}
       <AnimatePresence mode="wait">
@@ -559,7 +586,7 @@ function RotatingHeroDesktop({ days, onCta }: { days: number; onCta: () => void 
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -16 }}
             transition={{ duration: 0.4 }}
-            className="absolute top-4 right-4 flex items-center gap-2 bg-ink/60 backdrop-blur-sm px-3 py-1.5"
+            className="absolute top-4 right-4 flex items-center gap-2 bg-ink/60 backdrop-blur-sm px-3 py-1.5 border border-paper/10"
           >
             <Flag team={team} size={20} className="rounded-none" />
             <span className="font-mono text-[10px] text-paper tracking-eyebrow font-bold">{theme.label}</span>
@@ -567,18 +594,29 @@ function RotatingHeroDesktop({ days, onCta }: { days: number; onCta: () => void 
         )}
       </AnimatePresence>
 
+      {/* Slide dots */}
+      <div className="absolute bottom-[100px] left-0 right-0 flex justify-center gap-1">
+        {heroImages.slice(0, 8).map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setIdx(i)}
+            className={cn('w-1 h-1 rounded-full transition-all', i === idx % 8 ? 'bg-yellow w-4' : 'bg-paper/30')}
+          />
+        ))}
+      </div>
+
       <div className="relative h-full flex flex-col justify-end p-6">
         <div className="font-mono text-[10px] font-bold tracking-eyebrow text-paper/60 mb-2">
           COPA DO MUNDO 2026 · USA / CAN / MEX
         </div>
         <div className="flex items-end gap-4 mb-3">
           <div>
-            <div className="font-display text-[110px] leading-none text-paper">{days}</div>
+            <div className="font-display text-[110px] leading-none text-paper drop-shadow-lg">{days}</div>
             <div className="font-display text-3xl text-paper/60 -mt-2">DIAS</div>
           </div>
           <div className="pb-2">
             <div className="font-serif-it text-xl text-yellow">para a bola rolar</div>
-            <div className="font-mono text-[11px] text-paper/50 mt-1">Fase de grupos · 11 Jun · 16:00</div>
+            <div className="font-mono text-[11px] text-paper/50 mt-1">Fase de grupos · 11 Jun · 17:00</div>
           </div>
         </div>
         <button onClick={onCta} className="btn-yellow w-fit">FAZER PALPITES AGORA →</button>

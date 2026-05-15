@@ -971,17 +971,51 @@ function KnockoutTab() {
   )
 }
 
+// ─── General picks validation ─────────────────────────────────────────────────
+
+function getGroupOfTeam(code: string): string | null {
+  for (const g of WC2026_GROUPS) {
+    if (g.teams.includes(code)) return g.id
+  }
+  return null
+}
+
+export function validateGeneralPicks(
+  champion: string | null,
+  vice: string | null
+): { valid: boolean; error: string | null } {
+  if (!champion || !vice) return { valid: true, error: null }
+  if (champion === vice) return { valid: false, error: 'Campeão e vice não podem ser a mesma seleção.' }
+  const cGroup = getGroupOfTeam(champion)
+  const vGroup = getGroupOfTeam(vice)
+  if (cGroup && vGroup && cGroup === vGroup)
+    return { valid: false, error: `Campeão e vice não podem ser do mesmo grupo (Grupo ${cGroup}). Escolha seleções de grupos diferentes.` }
+  return { valid: true, error: null }
+}
+
 // ─── Team picker grid ─────────────────────────────────────────────────────────
 
 function TeamPickerGrid({
-  label, pts, pick, onPick,
-}: { label: string; pts: number; pick: string | null; onPick: (code: string) => void }) {
+  label, pts, pick, onPick, disabledCodes = [], disabledReason,
+}: {
+  label: string
+  pts: number
+  pick: string | null
+  onPick: (code: string) => void
+  disabledCodes?: string[]
+  disabledReason?: string
+}) {
   return (
     <div>
       <div className="flex items-baseline gap-2 mb-3">
         <span className="font-display text-2xl leading-none">{label}</span>
         <span className="font-mono text-[9px] text-ink-3">+{pts} pontos</span>
       </div>
+      {disabledReason && (
+        <div className="mb-3 px-3 py-2 border border-yellow/40 bg-yellow/5">
+          <p className="font-mono text-[9px] text-ink-3 leading-relaxed">{disabledReason}</p>
+        </div>
+      )}
       {pick && (
         <div className="mb-3 flex items-center gap-2.5 p-2.5 border-2 border-ink bg-yellow">
           <Flag team={TEAMS[pick]} size={28} />
@@ -1001,14 +1035,19 @@ function TeamPickerGrid({
                 const team = TEAMS[code]
                 if (!team) return null
                 const selected = pick === code
+                const blocked = !selected && disabledCodes.includes(code)
                 return (
                   <motion.button
                     key={code}
-                    onClick={() => onPick(code)}
-                    whileTap={{ scale: 0.95 }}
+                    onClick={() => !blocked && onPick(code)}
+                    whileTap={blocked ? {} : { scale: 0.95 }}
+                    disabled={blocked}
+                    title={blocked ? disabledReason : undefined}
                     className={[
                       'flex flex-col items-center gap-1 py-2 px-1 border-2 transition-colors',
-                      selected ? 'border-ink bg-yellow' : 'border-hairline hover:border-ink',
+                      selected ? 'border-ink bg-yellow' :
+                      blocked  ? 'border-hairline opacity-30 cursor-not-allowed' :
+                                 'border-hairline hover:border-ink',
                     ].join(' ')}
                   >
                     <Flag team={team} size={24} />
@@ -1032,6 +1071,31 @@ function ChampionTab() {
   const { championPick, vicePick, scorerPick, setChampionPick, setVicePick, setScorerPick } = usePredictionStore()
   const [scorerInput, setScorerInput] = useState(scorerPick ?? '')
   const [section, setSection] = useState<'champion' | 'vice' | 'scorer'>('champion')
+
+  // Groups blocked for vice (same group as champion) — and vice-versa
+  const championGroup = championPick ? getGroupOfTeam(championPick) : null
+  const viceGroup     = vicePick     ? getGroupOfTeam(vicePick)     : null
+
+  const viceDisabledCodes = championPick
+    ? WC2026_GROUPS.find(g => g.id === championGroup)?.teams ?? []
+    : []
+  const championDisabledCodes = vicePick
+    ? WC2026_GROUPS.find(g => g.id === viceGroup)?.teams ?? []
+    : []
+
+  function handleChampionPick(code: string) {
+    // If vice is from the same group, clear it
+    if (vicePick && getGroupOfTeam(vicePick) === getGroupOfTeam(code)) {
+      setVicePick('')
+    }
+    setChampionPick(code)
+  }
+
+  function handleVicePick(code: string) {
+    // If champion is from the same group, prevent pick
+    if (championPick && getGroupOfTeam(championPick) === getGroupOfTeam(code)) return
+    setVicePick(code)
+  }
 
   const now = new Date()
   const isDeadlinePassed = now >= GENERAL_DEADLINE
@@ -1089,10 +1153,18 @@ function ChampionTab() {
       )}
 
       {!isDeadlinePassed && section === 'champion' && (
-        <TeamPickerGrid label="CAMPEÃO" pts={25} pick={championPick} onPick={setChampionPick} />
+        <TeamPickerGrid
+          label="CAMPEÃO" pts={25} pick={championPick} onPick={handleChampionPick}
+          disabledCodes={championDisabledCodes}
+          disabledReason={vicePick ? `Times do mesmo grupo que o vice (Grupo ${viceGroup}) estão bloqueados.` : undefined}
+        />
       )}
       {!isDeadlinePassed && section === 'vice' && (
-        <TeamPickerGrid label="VICE-CAMPEÃO" pts={15} pick={vicePick} onPick={setVicePick} />
+        <TeamPickerGrid
+          label="VICE-CAMPEÃO" pts={15} pick={vicePick} onPick={handleVicePick}
+          disabledCodes={viceDisabledCodes}
+          disabledReason={championPick ? `Campeão e vice não podem ser do mesmo grupo. Times do Grupo ${championGroup} estão bloqueados.` : undefined}
+        />
       )}
       {!isDeadlinePassed && section === 'scorer' && (
         <div>
