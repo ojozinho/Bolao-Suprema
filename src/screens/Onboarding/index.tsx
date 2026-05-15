@@ -27,7 +27,7 @@ const slides = [
     eyebrow: '03 · BORA',
     stamp: '11 JUN',
     head: ['72 JOGOS,', '48 SELEÇÕES,', '1 CAMPEÃO'],
-    kicker: 'Fase de grupos a partir de 11 Jun · 15h',
+    kicker: 'Fase de grupos a partir de 11 Jun · 16:00 BRT',
     body: 'Cria seu perfil, faz suas apostas gerais e entra na disputa. Quem sabe mais de futebol aqui?',
   },
 ]
@@ -38,7 +38,7 @@ const MARQUEE_ITEMS = [
   '48 SELEÇÕES',
   '72 JOGOS NA FASE DE GRUPOS',
   'APOSTAS ABERTAS',
-  'FASE DE GRUPOS · 11 JUN',
+  'FASE DE GRUPOS · 11 JUN · 16:00 BRT',
   'FINAL · 19 JUL',
   'BORA JOGAR →',
 ]
@@ -168,7 +168,7 @@ function OnboardingDesktop() {
               {[
                 { val: '102',   label: 'partidas' },
                 { val: '48',    label: 'seleções' },
-                { val: '11 Jun', label: 'início' },
+                { val: '16:00', label: '11 Jun · BRT' },
                 { val: '+25',   label: 'pts campeão' },
               ].map(({ val, label }) => (
                 <div key={label}>
