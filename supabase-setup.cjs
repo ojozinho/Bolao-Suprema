@@ -470,8 +470,26 @@ async function main() {
 
   console.log()
 
-  // ── 3. Configurar Auth ────────────────────────────────────────────────────
-  console.log('③ Configurando autenticação OTP…')
+  // ── 3. Criar bucket de storage ────────────────────────────────────────────
+  console.log('③ Criando bucket de storage…')
+  const bucketRes = await apiRequest('POST', `/v1/projects/${PROJECT_REF}/storage/buckets`, {
+    id: 'user-media',
+    name: 'user-media',
+    public: true,
+    file_size_limit: 5242880, // 5MB
+    allowed_mime_types: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+  })
+  if (bucketRes.status === 200 || bucketRes.status === 201) {
+    console.log('  ▸ Bucket user-media criado ✓')
+  } else if (bucketRes.status === 409 || (typeof bucketRes.body === 'object' && JSON.stringify(bucketRes.body).includes('already exists'))) {
+    console.log('  ▸ Bucket user-media já existe ✓')
+  } else {
+    console.log('  ⚠️  Bucket (ignorar se já existe):', JSON.stringify(bucketRes.body))
+  }
+  console.log()
+
+  // ── 4. Configurar Auth ────────────────────────────────────────────────────
+  console.log('④ Configurando autenticação OTP…')
 
   const emailTemplate = fs.readFileSync(path.join(__dirname, 'email-template.html'), 'utf8')
 
@@ -493,8 +511,17 @@ async function main() {
     authConfig.smtp_user         = 'resend'
     authConfig.smtp_pass         = RESEND_KEY
     authConfig.smtp_sender_name  = 'Bolão Suprema'
-    authConfig.rate_limit_email_sent = 60  // 60 e-mails por hora por endereço
+    authConfig.rate_limit_email_sent = 60
     console.log('  ▸ SMTP via Resend configurado no payload')
+  } else {
+    // Reverter para e-mail padrão do Supabase (limpa SMTP customizado)
+    authConfig.smtp_host        = ''
+    authConfig.smtp_port        = 587
+    authConfig.smtp_user        = ''
+    authConfig.smtp_pass        = ''
+    authConfig.smtp_admin_email = ''
+    authConfig.smtp_sender_name = ''
+    console.log('  ▸ Revertendo para e-mail padrão do Supabase')
   }
 
   const authRes = await apiRequest('PATCH', `/v1/projects/${PROJECT_REF}/config/auth`, authConfig)

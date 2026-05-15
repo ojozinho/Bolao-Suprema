@@ -451,7 +451,7 @@ function RotatingHero({ days, children }: { days: number; children?: React.React
         </div>
         <div className="font-display text-[80px] leading-none text-paper">{days}</div>
         <div className="font-display text-2xl text-paper/70 -mt-1">DIAS</div>
-        <div className="font-serif-it text-sm text-yellow mt-1">para a bola rolar · 11 Jun · 16:00</div>
+        <div className="font-serif-it text-sm text-yellow mt-1">para a bola rolar · 11 Jun · 17:00</div>
       </div>
 
       {children}
@@ -459,7 +459,7 @@ function RotatingHero({ days, children }: { days: number; children?: React.React
   )
 }
 
-const TOURNAMENT_START = new Date('2026-06-11T19:00:00Z') // 16:00 BRT = 19:00 UTC
+const TOURNAMENT_START = new Date('2026-06-11T20:00:00Z') // 17:00 BRT = 20:00 UTC
 
 function daysUntil(target: Date): number {
   const now = new Date()

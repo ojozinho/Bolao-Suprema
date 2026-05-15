@@ -20,17 +20,26 @@ interface GifResult {
 
 async function fetchGifs(query: string): Promise<GifResult[]> {
   if (!TENOR_KEY) return []
-  const endpoint = query.trim()
-    ? `https://api.tenor.com/v1/search?q=${encodeURIComponent(query)}&key=${TENOR_KEY}&limit=20&contentfilter=medium&media_filter=minimal`
-    : `https://api.tenor.com/v1/trending?key=${TENOR_KEY}&limit=20&contentfilter=medium&media_filter=minimal`
+  const params = new URLSearchParams({
+    key: TENOR_KEY,
+    client_key: 'bolao_suprema',
+    limit: '20',
+    contentfilter: 'medium',
+    media_filter: 'gif,tinygif',
+  })
+  if (query.trim()) params.set('q', query.trim())
+  const base = 'https://tenor.googleapis.com/v2'
+  const endpoint = query.trim() ? `${base}/search?${params}` : `${base}/featured?${params}`
   try {
     const res = await fetch(endpoint)
     if (!res.ok) return []
-    const data = await res.json() as { results: { id: string; media: { tinygif?: { url: string }; gif?: { url: string } }[] }[] }
+    const data = await res.json() as {
+      results: { id: string; media_formats: { gif?: { url: string }; tinygif?: { url: string } } }[]
+    }
     return (data.results ?? []).map(r => ({
       id: r.id,
-      url: r.media[0]?.gif?.url ?? '',
-      preview: r.media[0]?.tinygif?.url ?? r.media[0]?.gif?.url ?? '',
+      url: r.media_formats.gif?.url ?? '',
+      preview: r.media_formats.tinygif?.url ?? r.media_formats.gif?.url ?? '',
     })).filter(g => g.url)
   } catch {
     return []
@@ -86,7 +95,12 @@ function GifPicker({ onSelect, onClose }: { onSelect: (url: string) => void; onC
         </button>
       </div>
       <div className="h-[calc(300px-44px)] overflow-y-auto overscroll-contain">
-        {loading ? (
+        {!TENOR_KEY ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2 px-4 text-center">
+            <span className="font-mono text-[11px] text-ink-3">GIFs desabilitados</span>
+            <span className="font-mono text-[9px] text-ink-4 leading-relaxed">Adicione VITE_TENOR_KEY nas variáveis de ambiente do projeto (GitHub Secrets)</span>
+          </div>
+        ) : loading ? (
           <div className="flex items-center justify-center h-full">
             <span className="font-mono text-[11px] text-ink-3 animate-pulse">CARREGANDO...</span>
           </div>
@@ -448,7 +462,7 @@ function ChatInput({
 // ─── Screen ─────────────────────────────────────────────────────────────────────
 
 export function ResenhaScreen() {
-  const { messages, pinnedId, addMessage, setPinned, voteOnPoll } = useChatStore()
+  const { messages, pinnedId, lastError, addMessage, clearError, setPinned, voteOnPoll } = useChatStore()
   const [gifOpen, setGifOpen] = useState(false)
   const [pollOpen, setPollOpen] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -630,6 +644,23 @@ export function ResenhaScreen() {
         ))}
         <div ref={bottomRef} />
       </div>
+
+      {/* ── Error banner ── */}
+      <AnimatePresence>
+        {lastError && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: 'auto' }}
+            exit={{ height: 0 }}
+            className="overflow-hidden flex-shrink-0"
+          >
+            <div className="flex items-center justify-between px-4 py-2 bg-red/10 border-t border-red/30">
+              <span className="font-mono text-[10px] text-red">{lastError}</span>
+              <button onClick={clearError} className="font-mono text-[10px] text-red/60 hover:text-red ml-3">✕</button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── GIF Picker (slide up) ── */}
       <AnimatePresence>

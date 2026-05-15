@@ -103,20 +103,23 @@ interface ChatState {
   messages:   ChatMessage[]
   pinnedId:   string | null
   isLoaded:   boolean
+  lastError:  string | null
   _myUserId:  string | undefined
   _channel:   ReturnType<typeof supabase.channel> | null
 
-  init:       (myUserId: string) => Promise<void>
-  destroy:    () => void
-  addMessage: (msg: ChatMessage) => void
-  setPinned:  (id: string | null) => Promise<void>
-  voteOnPoll: (msgId: string, userId: string, optionId: string) => Promise<void>
+  init:        (myUserId: string) => Promise<void>
+  destroy:     () => void
+  addMessage:  (msg: ChatMessage) => void
+  clearError:  () => void
+  setPinned:   (id: string | null) => Promise<void>
+  voteOnPoll:  (msgId: string, userId: string, optionId: string) => Promise<void>
 }
 
 export const useChatStore = create<ChatState>()((set, get) => ({
   messages:  [],
   pinnedId:  null,
   isLoaded:  false,
+  lastError: null,
   _myUserId: undefined,
   _channel:  null,
 
@@ -236,8 +239,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   destroy: () => {
     const { _channel } = get()
     if (_channel) supabase.removeChannel(_channel)
-    set({ _channel: null, messages: [], pinnedId: null, isLoaded: false, _myUserId: undefined })
+    set({ _channel: null, messages: [], pinnedId: null, isLoaded: false, lastError: null, _myUserId: undefined })
   },
+
+  clearError: () => set({ lastError: null }),
 
   // ── addMessage (with rate limiting) ─────────────────────────────────────
 
@@ -275,8 +280,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
     supabase.from('chat_messages').insert(row).then(({ error }) => {
       if (error) {
-        console.error('[Chat] Falha ao salvar mensagem:', error.message)
-        set(s => ({ messages: s.messages.filter(m => m.id !== msg.id) }))
+        console.error('[Chat] Falha ao salvar mensagem:', error.message, error.code)
+        set(s => ({
+          messages: s.messages.filter(m => m.id !== msg.id),
+          lastError: `Erro ao enviar: ${error.message}`,
+        }))
       }
     })
   },
@@ -284,15 +292,16 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   // ── setPinned (persisted) ─────────────────────────────────────────────────
 
   setPinned: async (id) => {
+    const myUserId = get()._myUserId
     set({ pinnedId: id })
 
     if (isMockMode) return
 
     if (id === null) {
       await supabase.from('channel_pins').delete().eq('channel_id', 'geral')
-    } else {
+    } else if (myUserId) {
       await supabase.from('channel_pins').upsert(
-        { channel_id: 'geral', message_id: id, pinned_at: new Date().toISOString() },
+        { channel_id: 'geral', message_id: id, pinned_by: myUserId },
         { onConflict: 'channel_id' }
       )
     }
