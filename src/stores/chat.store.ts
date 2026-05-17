@@ -150,7 +150,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       .from('chat_messages')
       .select(`
         id, user_id, channel_id, text, type, gif_url, poll_data, reaction, created_at,
-        users ( id, first_name, last_name, dept, initials, color, avatar_url )
+        users!user_id ( id, first_name, last_name, dept, initials, color, avatar_url )
       `)
       .eq('channel_id', 'geral')
       .order('created_at', { ascending: true })
@@ -190,7 +190,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       .from('channel_pins')
       .select('message_id')
       .eq('channel_id', 'geral')
-      .single()
+      .maybeSingle()
 
     if (pinData) {
       set({ pinnedId: (pinData as PinRow).message_id })
