@@ -363,6 +363,17 @@ function WC26News({ compact = false }: { compact?: boolean }) {
   )
 }
 
+// picks whichever team color is brighter — ensures visibility on dark bg
+function teamAccentColor(c1: string, c2: string): string {
+  const lum = (hex: string) => {
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    return 0.299 * r + 0.587 * g + 0.114 * b
+  }
+  return lum(c1) >= lum(c2) ? c1 : c2
+}
+
 function RotatingHero({ days, children }: { days: number; children?: React.ReactNode }) {
   const [idx, setIdx] = useState(0)
 
@@ -373,80 +384,88 @@ function RotatingHero({ days, children }: { days: number; children?: React.React
 
   const theme = HERO_THEMES[idx]
   const team = TEAMS[theme.code]
+  const accent = teamAccentColor(theme.c1, theme.c2)
 
   return (
-    <section className="relative overflow-hidden" style={{ height: 300 }}>
-      {/* Gradient background — team colours */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`bg-${idx}`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.9 }}
-          className="absolute inset-0"
-          style={{ background: `linear-gradient(135deg, ${theme.c1} 0%, ${theme.c2} 100%)` }}
-        />
-      </AnimatePresence>
+    <section className="relative overflow-hidden bg-ink flex flex-col" style={{ height: 300 }}>
+      {/* Left border — team accent color */}
+      <motion.div
+        key={`bar-${idx}`}
+        animate={{ backgroundColor: accent }}
+        transition={{ duration: 0.5 }}
+        className="absolute left-0 top-0 bottom-0 w-[3px]"
+      />
 
-      {/* Stripe texture */}
-      <div className="absolute inset-0 bg-stripe opacity-10" />
-
-      {/* Depth gradient to black at bottom */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-ink/20 to-ink/85" />
-
-      {/* Large decorative flag watermark */}
-      <AnimatePresence mode="wait">
-        {team && (
-          <motion.img
-            key={`flag-${idx}`}
-            src={team.flag}
-            alt=""
-            initial={{ opacity: 0, scale: 1.15 }}
-            animate={{ opacity: 0.12, scale: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.9 }}
-            className="absolute -right-6 -top-6 w-44 h-44 object-cover select-none pointer-events-none"
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Team badge */}
-      <AnimatePresence mode="wait">
-        {team && (
-          <motion.div
-            key={`badge-${idx}`}
-            initial={{ opacity: 0, x: 12 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -12 }}
-            transition={{ duration: 0.4 }}
-            className="absolute top-4 right-4 flex items-center gap-2 bg-ink/60 backdrop-blur-sm px-3 py-1.5 border border-paper/10"
-          >
-            <Flag team={team} size={18} className="rounded-none" />
-            <span className="font-mono text-[10px] text-paper tracking-eyebrow font-bold">{theme.label}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Slide dots */}
-      <div className="absolute bottom-[72px] left-0 right-0 flex justify-center gap-1">
-        {HERO_THEMES.slice(0, 8).map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setIdx(i)}
-            className={cn('w-1 h-1 rounded-full transition-all', i === idx ? 'bg-yellow w-4' : 'bg-paper/30')}
-          />
-        ))}
+      {/* Top row */}
+      <div className="flex items-center justify-between px-5 pt-4 pl-6">
+        <span className="font-mono text-[8px] tracking-eyebrow text-paper/30 uppercase">
+          Copa do Mundo 2026 · USA / CAN / MEX
+        </span>
+        <AnimatePresence mode="wait">
+          {team && (
+            <motion.div
+              key={`badge-${idx}`}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center gap-1.5 border border-paper/10 px-2 py-1"
+            >
+              <Flag team={team} size={14} className="rounded-none" />
+              <span className="font-mono text-[9px] font-bold tracking-eyebrow" style={{ color: accent }}>
+                {theme.label}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Countdown */}
-      <div className="absolute inset-0 flex flex-col items-center justify-end pb-8 px-4 text-center">
-        <div className="font-mono text-[10px] tracking-eyebrow text-paper/60 mb-1">
-          COPA DO MUNDO 2026 · USA / CAN / MEX
+      {/* Team name — the main visual element */}
+      <div className="flex-1 flex items-center pl-6 overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={`name-${idx}`}
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 16 }}
+            transition={{ duration: 0.4 }}
+            className="font-display leading-none tracking-display select-none"
+            style={{ fontSize: 'clamp(58px, 16vw, 96px)', color: accent }}
+          >
+            {theme.label}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+
+      {/* Bottom — countdown + dots */}
+      <div className="px-5 pb-4 pl-6">
+        <motion.div
+          animate={{ borderColor: `${accent}50` }}
+          transition={{ duration: 0.5 }}
+          className="border-t mb-3"
+        />
+        <div className="flex items-end justify-between">
+          <div className="flex items-baseline gap-3">
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-display text-[60px] leading-none text-paper">{days}</span>
+              <span className="font-mono text-[10px] tracking-eyebrow text-paper/40 self-end pb-1">DIAS</span>
+            </div>
+            <div>
+              <div className="font-serif-it text-sm text-yellow">para a bola rolar</div>
+              <div className="font-mono text-[8px] text-paper/30 mt-0.5">11 Jun · 16:00 · Horário de Brasília</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 pb-0.5">
+            {HERO_THEMES.slice(0, 8).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setIdx(i)}
+                style={i === idx ? { backgroundColor: accent, width: 14 } : undefined}
+                className={cn('h-[3px] rounded-full transition-all duration-300', i !== idx && 'w-[3px] bg-paper/20')}
+              />
+            ))}
+          </div>
         </div>
-        <div className="font-display text-[80px] leading-none text-paper drop-shadow-lg">{days}</div>
-        <div className="font-display text-2xl text-paper/70 -mt-1">DIAS</div>
-        <div className="font-serif-it text-sm text-yellow mt-1">para a bola rolar · 11 Jun · 16:00 BRT</div>
       </div>
 
       {children}
@@ -503,87 +522,91 @@ function RotatingHeroDesktop({ days, onCta }: { days: number; onCta: () => void 
 
   const theme = HERO_THEMES[idx]
   const team = TEAMS[theme.code]
+  const accent = teamAccentColor(theme.c1, theme.c2)
 
   return (
-    <div className="relative overflow-hidden min-h-[340px] border-2 border-ink">
-      {/* Gradient background — team colours */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`dbg-${idx}`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.9 }}
-          className="absolute inset-0"
-          style={{ background: `linear-gradient(135deg, ${theme.c1} 0%, ${theme.c2} 100%)` }}
-        />
-      </AnimatePresence>
+    <div className="relative overflow-hidden bg-ink border-2 border-ink flex flex-col" style={{ minHeight: 340 }}>
+      {/* Left border — team accent color */}
+      <motion.div
+        key={`dbar-${idx}`}
+        animate={{ backgroundColor: accent }}
+        transition={{ duration: 0.5 }}
+        className="absolute left-0 top-0 bottom-0 w-1"
+      />
 
-      {/* Stripe texture */}
-      <div className="absolute inset-0 bg-stripe opacity-10" />
-
-      {/* Depth gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-ink/15 to-ink/85" />
-
-      {/* Large decorative flag watermark */}
-      <AnimatePresence mode="wait">
-        {team && (
-          <motion.img
-            key={`dflag-${idx}`}
-            src={team.flag}
-            alt=""
-            initial={{ opacity: 0, scale: 1.15 }}
-            animate={{ opacity: 0.12, scale: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.9 }}
-            className="absolute -right-8 -top-8 w-64 h-64 object-cover select-none pointer-events-none"
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Team badge top-right */}
-      <AnimatePresence mode="wait">
-        {team && (
-          <motion.div
-            key={`d-badge-${idx}`}
-            initial={{ opacity: 0, x: 12 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -12 }}
-            transition={{ duration: 0.4 }}
-            className="absolute top-4 right-4 flex items-center gap-2 bg-ink/60 backdrop-blur-sm px-3 py-1.5 border border-paper/10"
-          >
-            <Flag team={team} size={20} className="rounded-none" />
-            <span className="font-mono text-[10px] text-paper tracking-eyebrow font-bold">{theme.label}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Slide dots */}
-      <div className="absolute bottom-[100px] left-0 right-0 flex justify-center gap-1">
-        {HERO_THEMES.slice(0, 8).map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setIdx(i)}
-            className={cn('w-1 h-1 rounded-full transition-all', i === idx ? 'bg-yellow w-4' : 'bg-paper/30')}
-          />
-        ))}
+      {/* Top row */}
+      <div className="flex items-center justify-between px-6 pt-5 pl-7">
+        <span className="font-mono text-[9px] tracking-eyebrow text-paper/30 uppercase">
+          Copa do Mundo 2026 · USA / CAN / MEX
+        </span>
+        <AnimatePresence mode="wait">
+          {team && (
+            <motion.div
+              key={`d-badge-${idx}`}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center gap-2 border border-paper/10 px-3 py-1.5"
+            >
+              <Flag team={team} size={16} className="rounded-none" />
+              <span className="font-mono text-[9px] font-bold tracking-eyebrow" style={{ color: accent }}>
+                {theme.label}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      <div className="relative h-full flex flex-col justify-end p-6">
-        <div className="font-mono text-[10px] font-bold tracking-eyebrow text-paper/60 mb-2">
-          COPA DO MUNDO 2026 · USA / CAN / MEX
-        </div>
-        <div className="flex items-end gap-4 mb-3">
-          <div>
-            <div className="font-display text-[110px] leading-none text-paper drop-shadow-lg">{days}</div>
-            <div className="font-display text-3xl text-paper/60 -mt-2">DIAS</div>
+      {/* Team name — the main visual */}
+      <div className="flex-1 flex items-center pl-7 overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={`d-name-${idx}`}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.4 }}
+            className="font-display leading-none tracking-display select-none"
+            style={{ fontSize: 'clamp(72px, 10vw, 130px)', color: accent }}
+          >
+            {theme.label}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+
+      {/* Bottom — countdown + CTA + dots */}
+      <div className="px-6 pb-5 pl-7">
+        <motion.div
+          animate={{ borderColor: `${accent}50` }}
+          transition={{ duration: 0.5 }}
+          className="border-t mb-4"
+        />
+        <div className="flex items-end justify-between">
+          <div className="flex items-end gap-6">
+            <div className="flex items-baseline gap-2">
+              <span className="font-display text-[80px] leading-none text-paper">{days}</span>
+              <span className="font-mono text-[11px] tracking-eyebrow text-paper/40 pb-2">DIAS</span>
+            </div>
+            <div className="pb-1">
+              <div className="font-serif-it text-lg text-yellow">para a bola rolar</div>
+              <div className="font-mono text-[9px] text-paper/30 mt-0.5">11 Jun · 16:00 · Horário de Brasília</div>
+            </div>
           </div>
-          <div className="pb-2">
-            <div className="font-serif-it text-xl text-yellow">para a bola rolar</div>
-            <div className="font-mono text-[11px] text-paper/50 mt-1">11 Jun · 16:00 · Horário de Brasília</div>
+          <div className="flex flex-col items-end gap-3">
+            <button onClick={onCta} className="btn-yellow">FAZER PALPITES AGORA →</button>
+            <div className="flex items-center gap-1">
+              {HERO_THEMES.slice(0, 8).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setIdx(i)}
+                  style={i === idx ? { backgroundColor: accent, width: 14 } : undefined}
+                  className={cn('h-[3px] rounded-full transition-all duration-300', i !== idx && 'w-[3px] bg-paper/20')}
+                />
+              ))}
+            </div>
           </div>
         </div>
-        <button onClick={onCta} className="btn-yellow w-fit">FAZER PALPITES AGORA →</button>
       </div>
     </div>
   )
