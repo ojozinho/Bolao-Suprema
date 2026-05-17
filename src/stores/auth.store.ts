@@ -53,7 +53,7 @@ function mapUser(row: UserRow): AppUser {
     isMarketing:       row.is_marketing ?? false,
     isOwner:           row.is_owner ?? false,
     userRole:          row.user_role ?? (row.is_admin ? 'admin' : row.is_marketing ? 'marketing' : 'user'),
-    participantStatus: row.participant_status ?? 'active',
+    participantStatus: row.participant_status === 'blocked' ? 'blocked' : 'active',
     privacyHideEmail:  row.privacy_hide_email ?? true,
     privacyHideProfile: row.privacy_hide_profile ?? false,
     createdAt:         row.created_at  ?? new Date().toISOString(),
@@ -169,7 +169,7 @@ export const useAuthStore = create<AuthState>()(
             isMarketing: false,
             isOwner: false,
             userRole: 'user',
-            participantStatus: 'pending',
+            participantStatus: 'active',
             privacyHideEmail: true,
             privacyHideProfile: false,
             createdAt: new Date().toISOString(),
@@ -286,9 +286,8 @@ export const useAuthStore = create<AuthState>()(
             favorite_player:     updated.favoritePlayer,
             favorite_player_img: updated.favoritePlayerImg ?? null,
             since:               updated.since,
-            // Auto-approve on profile save — only upgrades pending→active, never unblocks
-            ...(current.participantStatus !== 'blocked' && current.participantStatus !== 'removed'
-              && { participant_status: 'active' }),
+            // Auto-promote to active on profile save — never unblocks admin-blocked users
+            ...(current.participantStatus !== 'blocked' && { participant_status: 'active' }),
           })
           if (error) {
             console.error('[Profile] Erro ao salvar perfil:', error.message)

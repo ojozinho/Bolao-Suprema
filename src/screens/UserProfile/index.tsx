@@ -28,7 +28,7 @@ function mapUser(row: any): AppUser {
   isMarketing: row.is_marketing ?? false,
   isOwner: row.is_owner ?? false,
   userRole: row.user_role ?? (row.is_admin ? 'admin' : row.is_marketing ? 'marketing' : 'user'),
-  participantStatus: row.participant_status ?? 'active',
+  participantStatus: row.participant_status === 'blocked' ? 'blocked' : 'active',
   privacyHideEmail: row.privacy_hide_email ?? true,
   privacyHideProfile: row.privacy_hide_profile ?? false,
   createdAt: row.created_at ?? '',
