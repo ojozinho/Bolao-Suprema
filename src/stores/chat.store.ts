@@ -19,6 +19,7 @@ interface UserRow {
 interface MessageRow {
   id: string; user_id: string; channel_id: string | null
   text: string | null; type: string | null; gif_url: string | null
+  image_url: string | null; audio_url: string | null; audio_duration: number | null
   poll_data: Record<string, unknown> | null; reaction: string | null; created_at: string
   users?: UserRow | null
 }
@@ -70,11 +71,14 @@ function mapRow(row: MessageRow, myUserId?: string): ChatMessage {
     color:     u?.color    ?? '#777',
     avatarUrl: u?.avatarUrl,
     time:      new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    text:      row.text ?? '',
-    type:      (row.type as ChatMessage['type']) ?? 'text',
-    gifUrl:    row.gif_url  ?? undefined,
-    poll:      row.poll_data as ChatMessage['poll'],
-    reaction:  row.reaction ?? undefined,
+    text:          row.text ?? '',
+    type:          (row.type as ChatMessage['type']) ?? 'text',
+    gifUrl:        row.gif_url    ?? undefined,
+    imageUrl:      row.image_url  ?? undefined,
+    audioUrl:      row.audio_url  ?? undefined,
+    audioDuration: row.audio_duration ?? undefined,
+    poll:          row.poll_data as ChatMessage['poll'],
+    reaction:      row.reaction ?? undefined,
     isPinned:  false,
     isYou:     row.user_id === myUserId,
     createdAt: row.created_at,
@@ -300,9 +304,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       text:       msg.text ?? '',
       type:       msg.type ?? 'text',
     }
-    if (msg.gifUrl)   row.gif_url   = msg.gifUrl
-    if (msg.reaction) row.reaction  = msg.reaction
-    if (msg.poll)     row.poll_data = msg.poll
+    if (msg.gifUrl)        row.gif_url        = msg.gifUrl
+    if (msg.imageUrl)      row.image_url      = msg.imageUrl
+    if (msg.audioUrl)      row.audio_url      = msg.audioUrl
+    if (msg.audioDuration) row.audio_duration = msg.audioDuration
+    if (msg.reaction)      row.reaction       = msg.reaction
+    if (msg.poll)          row.poll_data      = msg.poll
 
     supabase.from('chat_messages').insert(row).then(({ error }) => {
       if (error) {

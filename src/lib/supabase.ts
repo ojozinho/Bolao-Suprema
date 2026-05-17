@@ -56,3 +56,31 @@ export async function uploadFile(
 
   throw new Error(`Falha ao enviar ${filename === 'banner' ? 'banner' : 'foto'}: ${lastError}`)
 }
+
+export async function uploadChatMedia(
+  userId: string,
+  file: File | Blob,
+  kind: 'image' | 'audio',
+): Promise<string> {
+  const maxBytes = kind === 'audio' ? 10 * 1024 * 1024 : 8 * 1024 * 1024
+  if (file.size > maxBytes) throw new Error(`Arquivo muito grande. Máximo: ${kind === 'audio' ? '10' : '8'} MB.`)
+
+  const ext = kind === 'audio'
+    ? (file.type.includes('mp4') ? 'mp4' : file.type.includes('ogg') ? 'ogg' : 'webm')
+    : (file.type.includes('png') ? 'png' : file.type.includes('gif') ? 'gif' : file.type.includes('webp') ? 'webp' : 'jpg')
+
+  const path = `chat/${kind}/${userId}/${Date.now()}.${ext}`
+
+  for (const bucket of ['chat-media', 'user-media']) {
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, { upsert: false, contentType: file.type || (kind === 'audio' ? 'audio/webm' : 'image/jpeg') })
+    if (!error) {
+      const { publicUrl } = supabase.storage.from(bucket).getPublicUrl(path).data
+      return publicUrl
+    }
+    console.error(`[Storage] ${bucket}/${path}:`, error.message)
+  }
+
+  throw new Error(`Falha ao enviar ${kind === 'audio' ? 'áudio' : 'imagem'}.`)
+}

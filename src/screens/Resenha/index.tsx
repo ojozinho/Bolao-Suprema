@@ -6,11 +6,10 @@ import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
 import { useChatStore } from '@/stores/chat.store'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
+import { uploadChatMedia } from '@/lib/supabase'
 import type { ChatMessage, ChatPoll } from '@/types'
 
 // ─── GIF API ─────────────────────────────────────────────────────────────────
-// Primary: Tenor v1 (public demo key — free, no auth required)
-// Fallback: Tenor v2 (if VITE_TENOR_KEY is set) or Giphy
 
 const TENOR_V1_KEY = 'LIVDSRZULELA'
 const TENOR_V2_KEY = import.meta.env.VITE_TENOR_KEY as string | undefined
@@ -20,8 +19,6 @@ interface GifResult { id: string; url: string; preview: string }
 
 async function fetchGifs(query: string): Promise<GifResult[]> {
   const q = query.trim()
-
-  // ── Tenor v1 (primary, always available) ──────────────────────────────────
   try {
     const base   = 'https://g.tenor.com/v1'
     const params = new URLSearchParams({
@@ -43,7 +40,6 @@ async function fetchGifs(query: string): Promise<GifResult[]> {
     }
   } catch { /* fall through */ }
 
-  // ── Tenor v2 (if custom key set) ──────────────────────────────────────────
   if (TENOR_V2_KEY) {
     try {
       const params = new URLSearchParams({
@@ -141,7 +137,6 @@ function GifPicker({ onSelect, onClose }: { onSelect: (url: string) => void; onC
 function PollModal({ onCreate, onClose }: { onCreate: (poll: ChatPoll) => void; onClose: () => void }) {
   const [question, setQuestion] = useState('')
   const [options, setOptions]   = useState(['', ''])
-
   const valid = question.trim().length > 0 && options.filter(o => o.trim()).length >= 2
 
   const handleCreate = () => {
@@ -191,9 +186,7 @@ function PollModal({ onCreate, onClose }: { onCreate: (poll: ChatPoll) => void; 
           ))}
           {options.length < 4 && (
             <button onClick={() => setOptions(prev => [...prev, ''])}
-              className="font-mono text-[10px] text-ink-3 hover:text-ink">
-              + ADICIONAR OPÇÃO
-            </button>
+              className="font-mono text-[10px] text-ink-3 hover:text-ink">+ ADICIONAR OPÇÃO</button>
           )}
         </div>
         <div className="flex gap-3 mt-6">
@@ -211,7 +204,69 @@ function PollModal({ onCreate, onClose }: { onCreate: (poll: ChatPoll) => void; 
   )
 }
 
-// ─── Message components ───────────────────────────────────────────────────────
+// ─── Audio recorder hook ─────────────────────────────────────────────────────
+
+function useAudioRecorder() {
+  const [recording, setRecording]   = useState(false)
+  const [seconds, setSeconds]       = useState(0)
+  const [uploading, setUploading]   = useState(false)
+  const mediaRef  = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const timerRef  = useRef<ReturnType<typeof setInterval>>(undefined)
+
+  const start = useCallback(async (): Promise<boolean> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
+        .find(m => MediaRecorder.isTypeSupported(m)) ?? ''
+      const mr = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+      chunksRef.current = []
+      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      mr.start(200)
+      mediaRef.current = mr
+      setRecording(true)
+      setSeconds(0)
+      timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000)
+      return true
+    } catch {
+      return false
+    }
+  }, [])
+
+  const stop = useCallback((): Promise<{ blob: Blob; duration: number } | null> => {
+    return new Promise(resolve => {
+      clearInterval(timerRef.current)
+      const mr = mediaRef.current
+      if (!mr) { resolve(null); return }
+      const dur = seconds
+      mr.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' })
+        mr.stream.getTracks().forEach(t => t.stop())
+        mediaRef.current = null
+        setRecording(false)
+        setSeconds(0)
+        resolve(blob.size > 0 ? { blob, duration: dur } : null)
+      }
+      mr.stop()
+    })
+  }, [seconds])
+
+  const cancel = useCallback(() => {
+    clearInterval(timerRef.current)
+    if (mediaRef.current) {
+      mediaRef.current.stream.getTracks().forEach(t => t.stop())
+      mediaRef.current = null
+    }
+    setRecording(false)
+    setSeconds(0)
+  }, [])
+
+  useEffect(() => () => { clearInterval(timerRef.current) }, [])
+
+  return { recording, seconds, uploading, setUploading, start, stop, cancel }
+}
+
+// ─── Message bubble parts ─────────────────────────────────────────────────────
 
 function UserAvatar({ m, onClick }: { m: ChatMessage; onClick?: () => void }) {
   return (
@@ -220,7 +275,7 @@ function UserAvatar({ m, onClick }: { m: ChatMessage; onClick?: () => void }) {
       disabled={!onClick}
       className={cn('flex-shrink-0 mt-0.5', onClick && 'hover:opacity-75 transition-opacity cursor-pointer')}
     >
-      <Avatar initials={m.initials} color={m.color} src={m.avatarUrl} size={28} />
+      <Avatar initials={m.initials} color={m.color} src={m.avatarUrl} size={30} />
     </button>
   )
 }
@@ -229,9 +284,9 @@ function MsgHeader({ m, navigate }: { m: ChatMessage; navigate: (path: string) =
   return (
     <button
       onClick={() => navigate(`/u/${m.userId}`)}
-      className="font-mono text-[10px] text-ink-3 hover:text-ink transition-colors text-left leading-none mb-1"
+      className="font-mono text-[10px] text-ink-3 hover:text-ink transition-colors text-left leading-none mb-1.5"
     >
-      <span className="font-bold text-ink-2">{m.who}</span>
+      <span className="font-bold text-ink">{m.who}</span>
       {m.dept && <span className="text-ink-4"> · {m.dept}</span>}
       <span className="text-ink-4"> · {m.time}</span>
     </button>
@@ -241,25 +296,25 @@ function MsgHeader({ m, navigate }: { m: ChatMessage; navigate: (path: string) =
 function TextBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
   const navigate = useNavigate()
   return (
-    <div className={cn('flex gap-2', m.isYou ? 'flex-row-reverse' : '')}>
+    <div className={cn('flex gap-2.5', m.isYou ? 'flex-row-reverse' : '')}>
       {!m.isYou && (
         grouped
-          ? <div className="w-7 flex-shrink-0" />
+          ? <div className="w-[30px] flex-shrink-0" />
           : <UserAvatar m={m} onClick={() => navigate(`/u/${m.userId}`)} />
       )}
       <div className={cn('max-w-[78%] md:max-w-[65%] flex flex-col gap-0.5', m.isYou ? 'items-end' : 'items-start')}>
         {!m.isYou && !grouped && <MsgHeader m={m} navigate={navigate} />}
         <div className={cn(
-          'px-3 py-2 text-[13px] leading-snug break-words whitespace-pre-wrap',
+          'px-3.5 py-2.5 text-[13px] leading-[1.45] break-words whitespace-pre-wrap shadow-sm',
           m.isYou
-            ? 'bg-yellow text-ink rounded-[14px_4px_14px_14px]'
-            : 'bg-paper-deep text-ink rounded-[4px_14px_14px_14px]',
+            ? 'bg-yellow text-ink rounded-[16px_4px_16px_16px]'
+            : 'bg-paper-deep text-ink rounded-[4px_16px_16px_16px]',
         )}>
           {m.text}
         </div>
-        {m.isYou && <span className="font-mono text-[9px] text-ink-4">{m.time}</span>}
+        {m.isYou && <span className="font-mono text-[9px] text-ink-4 mt-0.5">{m.time}</span>}
       </div>
-      {m.isYou && <div className="w-7 flex-shrink-0" />}
+      {m.isYou && <div className="w-[30px] flex-shrink-0" />}
     </div>
   )
 }
@@ -267,20 +322,128 @@ function TextBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
 function GifBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
   const navigate = useNavigate()
   return (
-    <div className={cn('flex gap-2', m.isYou ? 'flex-row-reverse' : '')}>
+    <div className={cn('flex gap-2.5', m.isYou ? 'flex-row-reverse' : '')}>
       {!m.isYou && (
         grouped
-          ? <div className="w-7 flex-shrink-0" />
+          ? <div className="w-[30px] flex-shrink-0" />
           : <UserAvatar m={m} onClick={() => navigate(`/u/${m.userId}`)} />
       )}
       <div className={cn('max-w-[60%] flex flex-col gap-0.5', m.isYou ? 'items-end' : 'items-start')}>
         {!m.isYou && !grouped && <MsgHeader m={m} navigate={navigate} />}
-        <div className={cn('overflow-hidden', m.isYou ? 'rounded-[14px_4px_14px_14px]' : 'rounded-[4px_14px_14px_14px]')}>
+        <div className={cn('overflow-hidden shadow-sm', m.isYou ? 'rounded-[16px_4px_16px_16px]' : 'rounded-[4px_16px_16px_16px]')}>
           <img src={m.gifUrl} alt="GIF" className="max-w-full max-h-52 object-contain block" loading="lazy" />
         </div>
-        {m.isYou && <span className="font-mono text-[9px] text-ink-4">{m.time}</span>}
+        {m.isYou && <span className="font-mono text-[9px] text-ink-4 mt-0.5">{m.time}</span>}
       </div>
-      {m.isYou && <div className="w-7 flex-shrink-0" />}
+      {m.isYou && <div className="w-[30px] flex-shrink-0" />}
+    </div>
+  )
+}
+
+function ImageBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <div className={cn('flex gap-2.5', m.isYou ? 'flex-row-reverse' : '')}>
+        {!m.isYou && (
+          grouped
+            ? <div className="w-[30px] flex-shrink-0" />
+            : <UserAvatar m={m} onClick={() => navigate(`/u/${m.userId}`)} />
+        )}
+        <div className={cn('max-w-[65%] flex flex-col gap-0.5', m.isYou ? 'items-end' : 'items-start')}>
+          {!m.isYou && !grouped && <MsgHeader m={m} navigate={navigate} />}
+          <button
+            onClick={() => setOpen(true)}
+            className={cn('overflow-hidden shadow-sm hover:opacity-90 transition-opacity', m.isYou ? 'rounded-[16px_4px_16px_16px]' : 'rounded-[4px_16px_16px_16px]')}
+          >
+            <img src={m.imageUrl} alt="Foto" className="max-w-full max-h-64 object-cover block" loading="lazy" />
+          </button>
+          {m.isYou && <span className="font-mono text-[9px] text-ink-4 mt-0.5">{m.time}</span>}
+        </div>
+        {m.isYou && <div className="w-[30px] flex-shrink-0" />}
+      </div>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-ink/90 flex items-center justify-center p-4"
+            onClick={() => setOpen(false)}
+          >
+            <img src={m.imageUrl} alt="Foto" className="max-w-full max-h-full object-contain" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  )
+}
+
+function fmtDur(s: number): string {
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+function AudioBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
+  const navigate = useNavigate()
+  const [playing, setPlaying] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [duration, setDuration] = useState(m.audioDuration ?? 0)
+  const audioRef = useRef<HTMLAudioElement>(null)
+
+  const toggle = () => {
+    const el = audioRef.current
+    if (!el) return
+    if (playing) { el.pause() } else { void el.play() }
+  }
+
+  return (
+    <div className={cn('flex gap-2.5', m.isYou ? 'flex-row-reverse' : '')}>
+      {!m.isYou && (
+        grouped
+          ? <div className="w-[30px] flex-shrink-0" />
+          : <UserAvatar m={m} onClick={() => navigate(`/u/${m.userId}`)} />
+      )}
+      <div className={cn('flex flex-col gap-0.5', m.isYou ? 'items-end' : 'items-start')}>
+        {!m.isYou && !grouped && <MsgHeader m={m} navigate={navigate} />}
+        <div className={cn(
+          'flex items-center gap-3 px-3.5 py-2.5 shadow-sm min-w-[180px]',
+          m.isYou ? 'bg-yellow text-ink rounded-[16px_4px_16px_16px]' : 'bg-paper-deep text-ink rounded-[4px_16px_16px_16px]',
+        )}>
+          <audio
+            ref={audioRef}
+            src={m.audioUrl}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => { setPlaying(false); setProgress(0) }}
+            onTimeUpdate={e => {
+              const el = e.currentTarget
+              setProgress(el.duration > 0 ? el.currentTime / el.duration : 0)
+            }}
+            onLoadedMetadata={e => {
+              const d = e.currentTarget.duration
+              if (isFinite(d)) setDuration(Math.round(d))
+            }}
+          />
+          <button
+            onClick={toggle}
+            className="w-8 h-8 rounded-full border-2 border-current flex items-center justify-center flex-shrink-0 hover:opacity-70 transition-opacity"
+          >
+            <span className="text-[11px] ml-0.5">{playing ? '■' : '▶'}</span>
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className={cn('h-1 rounded-full overflow-hidden', m.isYou ? 'bg-ink/20' : 'bg-ink/10')}>
+              <div
+                className={cn('h-full rounded-full transition-none', m.isYou ? 'bg-ink/60' : 'bg-ink/40')}
+                style={{ width: `${progress * 100}%` }}
+              />
+            </div>
+            <span className="font-mono text-[9px] opacity-60 mt-0.5 block">
+              {playing ? fmtDur(Math.round((audioRef.current?.currentTime ?? 0))) : fmtDur(duration)}
+            </span>
+          </div>
+        </div>
+        {m.isYou && <span className="font-mono text-[9px] text-ink-4 mt-0.5">{m.time}</span>}
+      </div>
+      {m.isYou && <div className="w-[30px] flex-shrink-0" />}
     </div>
   )
 }
@@ -293,7 +456,7 @@ function PollBubble({ m, userId, onVote }: { m: ChatMessage; userId?: string; on
   const total     = Object.keys(poll.votes).length
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2.5">
       <UserAvatar m={m} onClick={() => navigate(`/u/${m.userId}`)} />
       <div className="flex-1 max-w-sm">
         <MsgHeader m={m} navigate={navigate} />
@@ -340,7 +503,7 @@ function PollBubble({ m, userId, onVote }: { m: ChatMessage; userId?: string; on
 
 function DateSeparator({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-3 py-1">
+    <div className="flex items-center gap-3 py-2">
       <div className="flex-1 h-px bg-hairline" />
       <span className="font-mono text-[9px] text-ink-4 tracking-eyebrow">{label}</span>
       <div className="flex-1 h-px bg-hairline" />
@@ -362,15 +525,20 @@ function dayLabel(iso: string): string {
 const MAX_CHARS = 1000
 
 function ChatInput({
-  onSend, onGifToggle, gifActive,
+  onSend, onGifToggle, gifActive, onImageSend, onAudioSend,
 }: {
   onSend: (text: string) => void
   onGifToggle: () => void
   gifActive: boolean
+  onImageSend: (file: File) => Promise<void>
+  onAudioSend: (blob: Blob, duration: number) => Promise<void>
 }) {
   const [text, setText] = useState(() => {
     try { return localStorage.getItem(DRAFT_KEY) ?? '' } catch { return '' }
   })
+  const [imgUploading, setImgUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const audioRec = useAudioRecorder()
 
   const handleChange = (v: string) => {
     if (v.length > MAX_CHARS) return
@@ -385,19 +553,92 @@ function ChatInput({
     try { localStorage.removeItem(DRAFT_KEY) } catch { /* ok */ }
   }
 
+  const handleImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setImgUploading(true)
+    try { await onImageSend(file) } finally { setImgUploading(false) }
+  }
+
+  const handleMic = async () => {
+    if (audioRec.recording) {
+      const result = await audioRec.stop()
+      if (!result) return
+      audioRec.setUploading(true)
+      try { await onAudioSend(result.blob, result.duration) } finally { audioRec.setUploading(false) }
+    } else {
+      const ok = await audioRec.start()
+      if (!ok) alert('Permissão de microfone negada.')
+    }
+  }
+
+  if (audioRec.recording || audioRec.uploading) {
+    return (
+      <div className="border-t border-hairline bg-paper flex-shrink-0">
+        <div className="flex items-center gap-3 px-3 py-3">
+          <div className="flex items-center gap-2 flex-1">
+            <span className="w-2 h-2 rounded-full bg-red animate-pulse flex-shrink-0" />
+            <span className="font-mono text-[12px] text-red font-bold">{fmtDur(audioRec.seconds)}</span>
+            <span className="font-mono text-[10px] text-ink-4">GRAVANDO…</span>
+          </div>
+          <button
+            onClick={audioRec.cancel}
+            className="font-mono text-[10px] text-ink-3 border border-hairline px-3 py-1.5 hover:border-red hover:text-red transition-colors"
+          >
+            CANCELAR
+          </button>
+          <button
+            onClick={handleMic}
+            disabled={audioRec.uploading}
+            className="btn-yellow px-3 py-1.5 text-[11px] disabled:opacity-50"
+          >
+            {audioRec.uploading ? '...' : 'ENVIAR'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="border-t border-hairline bg-paper flex-shrink-0">
-      <div className="flex items-end gap-2 px-3 py-2.5">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleImage}
+      />
+      <div className="flex items-end gap-1.5 px-2 py-2">
+        {/* GIF */}
         <button
           onClick={onGifToggle}
           className={cn(
-            'flex-shrink-0 font-mono text-[10px] font-bold px-2.5 py-2 border transition-colors mb-0.5',
+            'flex-shrink-0 font-mono text-[10px] font-bold px-2 py-2 border transition-all mb-0.5 active:scale-90',
             gifActive ? 'bg-ink text-paper border-ink' : 'border-hairline text-ink-3 hover:border-ink hover:text-ink',
           )}
           title="Enviar GIF"
         >
           GIF
         </button>
+        {/* Photo */}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={imgUploading}
+          className="flex-shrink-0 w-9 h-9 mb-0.5 flex items-center justify-center border border-hairline text-ink-3 hover:border-ink hover:text-ink transition-all active:scale-90 disabled:opacity-40"
+          title="Enviar foto"
+        >
+          {imgUploading ? <span className="text-[10px] animate-pulse">…</span> : <span className="text-[15px]">⊕</span>}
+        </button>
+        {/* Mic */}
+        <button
+          onClick={handleMic}
+          className="flex-shrink-0 w-9 h-9 mb-0.5 flex items-center justify-center border border-hairline text-ink-3 hover:border-red hover:text-red transition-all active:scale-90"
+          title="Gravar áudio"
+        >
+          <span className="text-[15px]">◉</span>
+        </button>
+        {/* Text area */}
         <div className="flex-1 relative">
           <textarea
             value={text}
@@ -419,10 +660,11 @@ function ChatInput({
             </span>
           )}
         </div>
+        {/* Send */}
         <button
           onClick={handleSend}
           disabled={!text.trim()}
-          className="btn-yellow px-3 py-2 text-[11px] disabled:opacity-30 flex-shrink-0 mb-0.5 tracking-eyebrow font-bold"
+          className="btn-yellow px-3 py-2 text-[11px] disabled:opacity-30 flex-shrink-0 mb-0.5 tracking-eyebrow font-bold active:scale-95 transition-transform"
         >
           ENVIAR
         </button>
@@ -444,6 +686,7 @@ export function ResenhaScreen() {
   const [pollOpen,  setPollOpen]  = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [atBottom,  setAtBottom]  = useState(true)
+  const [mediaErr,  setMediaErr]  = useState<string | null>(null)
 
   const scrollRef        = useRef<HTMLDivElement>(null)
   const bottomRef        = useRef<HTMLDivElement>(null)
@@ -454,7 +697,6 @@ export function ResenhaScreen() {
     const el = scrollRef.current
     if (!el) return
     if (!didInitScrollRef.current) {
-      // instant jump on first render — avoids the "scroll from middle" bug on re-navigation
       el.scrollTop = el.scrollHeight
       didInitScrollRef.current = true
       setAtBottom(true)
@@ -492,9 +734,29 @@ export function ResenhaScreen() {
     [me],
   )
 
-  const sendText = useCallback((text: string) => addMessage(buildMsg({ text, type: 'text' })), [addMessage, buildMsg])
-  const sendGif  = useCallback((gifUrl: string) => { addMessage(buildMsg({ type: 'gif', gifUrl })); setGifOpen(false) }, [addMessage, buildMsg])
-  const sendPoll = useCallback((poll: ChatPoll) => { setPollOpen(false); addMessage(buildMsg({ text: poll.question, type: 'poll', poll, isYou: false })) }, [addMessage, buildMsg])
+  const sendText  = useCallback((text: string) => addMessage(buildMsg({ text, type: 'text' })), [addMessage, buildMsg])
+  const sendGif   = useCallback((gifUrl: string) => { addMessage(buildMsg({ type: 'gif', gifUrl })); setGifOpen(false) }, [addMessage, buildMsg])
+  const sendPoll  = useCallback((poll: ChatPoll) => { setPollOpen(false); addMessage(buildMsg({ text: poll.question, type: 'poll', poll, isYou: false })) }, [addMessage, buildMsg])
+
+  const sendImage = useCallback(async (file: File) => {
+    if (!me?.id) return
+    try {
+      const url = await uploadChatMedia(me.id, file, 'image')
+      addMessage(buildMsg({ type: 'image', imageUrl: url }))
+    } catch (e) {
+      setMediaErr(e instanceof Error ? e.message : 'Erro ao enviar imagem.')
+    }
+  }, [me, addMessage, buildMsg])
+
+  const sendAudio = useCallback(async (blob: Blob, duration: number) => {
+    if (!me?.id) return
+    try {
+      const url = await uploadChatMedia(me.id, blob, 'audio')
+      addMessage(buildMsg({ type: 'audio', audioUrl: url, audioDuration: duration }))
+    } catch (e) {
+      setMediaErr(e instanceof Error ? e.message : 'Erro ao enviar áudio.')
+    }
+  }, [me, addMessage, buildMsg])
 
   const togglePin = useCallback((id: string) => void setPinned(pinnedId === id ? null : id), [setPinned, pinnedId])
   const vote      = useCallback((msgId: string, optId: string) => void voteOnPoll(msgId, me?.id ?? 'me', optId), [me, voteOnPoll])
@@ -503,6 +765,8 @@ export function ResenhaScreen() {
   const pinnedPreview = pinnedMsg
     ? pinnedMsg.type === 'gif' ? '🖼 GIF'
     : pinnedMsg.type === 'poll' ? `📊 ${pinnedMsg.poll?.question ?? ''}`
+    : pinnedMsg.type === 'image' ? '📷 Foto'
+    : pinnedMsg.type === 'audio' ? '🎤 Áudio'
     : pinnedMsg.text
     : null
 
@@ -530,6 +794,8 @@ export function ResenhaScreen() {
     return items
   }, [messages])
 
+  const combinedError = lastError || mediaErr
+
   return (
     <div
       className="flex flex-col bg-paper overflow-hidden"
@@ -555,7 +821,7 @@ export function ResenhaScreen() {
           {isAdmin && (
             <button
               onClick={() => setPollOpen(true)}
-              className="font-mono text-[10px] font-bold px-3 py-1.5 bg-ink text-paper hover:bg-ink-2 transition-colors"
+              className="font-mono text-[10px] font-bold px-3 py-1.5 bg-ink text-paper hover:bg-ink-2 transition-colors active:scale-95"
             >
               + ENQUETE
             </button>
@@ -592,21 +858,19 @@ export function ResenhaScreen() {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 space-y-1 min-h-0"
+        className="flex-1 overflow-y-auto overscroll-contain px-3 md:px-5 py-3 min-h-0"
       >
-        {/* Loading skeleton */}
         {!isLoaded && (
-          <div className="flex flex-col gap-3 py-4">
+          <div className="flex flex-col gap-4 py-4">
             {[70, 50, 85, 60].map(w => (
-              <div key={w} className="flex gap-2 items-end">
-                <div className="w-7 h-7 rounded-full bg-hairline flex-shrink-0" />
-                <div className="h-9 rounded-[4px_14px_14px_14px] bg-hairline" style={{ width: `${w}%` }} />
+              <div key={w} className="flex gap-2.5 items-end">
+                <div className="w-[30px] h-[30px] rounded-full bg-hairline flex-shrink-0" />
+                <div className="h-10 rounded-[4px_16px_16px_16px] bg-hairline" style={{ width: `${w}%` }} />
               </div>
             ))}
           </div>
         )}
 
-        {/* Empty state */}
         {isLoaded && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-16">
             <span className="font-display text-6xl text-ink-4">○</span>
@@ -619,14 +883,23 @@ export function ResenhaScreen() {
           </div>
         )}
 
-        {/* Message list */}
-        {enriched.map(item => {
+        {enriched.map((item, idx) => {
           if (item.kind === 'date') return <DateSeparator key={item.key} label={item.label} />
           const { msg: m, grouped } = item
+
+          // Look ahead: is this the last message of a group (next is different user or date)?
+          const nextItem = enriched[idx + 1]
+          const isGroupEnd = !nextItem || nextItem.kind === 'date' ||
+            (nextItem.kind === 'msg' && (nextItem.msg.userId !== m.userId || nextItem.msg.type === 'poll'))
+
           return (
             <div
               key={m.id}
-              className={cn('relative group', grouped ? 'mt-0.5' : 'mt-3')}
+              className={cn(
+                'relative group',
+                grouped ? 'mt-1' : 'mt-5',
+                isGroupEnd && 'mb-2',
+              )}
               onMouseEnter={() => setHoveredId(m.id)}
               onMouseLeave={() => setHoveredId(null)}
             >
@@ -634,10 +907,13 @@ export function ResenhaScreen() {
                 ? <PollBubble m={m} userId={me?.id} onVote={optId => vote(m.id, optId)} />
                 : m.type === 'gif' && m.gifUrl
                   ? <GifBubble m={m} grouped={grouped} />
-                  : <TextBubble m={m} grouped={grouped} />
+                  : m.type === 'image' && m.imageUrl
+                    ? <ImageBubble m={m} grouped={grouped} />
+                    : m.type === 'audio' && m.audioUrl
+                      ? <AudioBubble m={m} grouped={grouped} />
+                      : <TextBubble m={m} grouped={grouped} />
               }
 
-              {/* Action buttons (admin: all messages; user: own messages) */}
               {(isAdmin || m.isYou) && hoveredId === m.id && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -680,7 +956,7 @@ export function ResenhaScreen() {
           >
             <button
               onClick={() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); setAtBottom(true) }}
-              className="bg-ink text-paper font-mono text-[10px] px-3 py-1.5 border border-ink shadow-card"
+              className="bg-ink text-paper font-mono text-[10px] px-3 py-1.5 border border-ink shadow-card active:scale-95 transition-transform"
             >
               ↓ VER NOVAS MSGS
             </button>
@@ -690,14 +966,17 @@ export function ResenhaScreen() {
 
       {/* ── Error banner ───────────────────────────────────────────────── */}
       <AnimatePresence>
-        {lastError && (
+        {combinedError && (
           <motion.div
             initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
             className="overflow-hidden flex-shrink-0"
           >
             <div className="flex items-center justify-between px-4 py-2 bg-red/8 border-t border-red/20">
-              <span className="font-mono text-[10px] text-red">{lastError}</span>
-              <button onClick={clearError} className="font-mono text-[10px] text-red/60 hover:text-red ml-3">✕</button>
+              <span className="font-mono text-[10px] text-red">{combinedError}</span>
+              <button
+                onClick={() => { clearError(); setMediaErr(null) }}
+                className="font-mono text-[10px] text-red/60 hover:text-red ml-3"
+              >✕</button>
             </div>
           </motion.div>
         )}
@@ -709,7 +988,13 @@ export function ResenhaScreen() {
       </AnimatePresence>
 
       {/* ── Input ──────────────────────────────────────────────────────── */}
-      <ChatInput onSend={sendText} onGifToggle={() => setGifOpen(v => !v)} gifActive={gifOpen} />
+      <ChatInput
+        onSend={sendText}
+        onGifToggle={() => setGifOpen(v => !v)}
+        gifActive={gifOpen}
+        onImageSend={sendImage}
+        onAudioSend={sendAudio}
+      />
 
       {/* ── Poll Modal ─────────────────────────────────────────────────── */}
       <AnimatePresence>

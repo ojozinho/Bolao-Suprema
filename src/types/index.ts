@@ -189,8 +189,11 @@ export interface ChatMessage {
   avatarUrl?: string
   time: string
   text: string
-  type?: 'text' | 'gif' | 'poll'
+  type?: 'text' | 'gif' | 'poll' | 'image' | 'audio'
   gifUrl?: string
+  imageUrl?: string
+  audioUrl?: string
+  audioDuration?: number
   isPinned?: boolean
   poll?: ChatPoll
   reaction?: string
