@@ -245,10 +245,18 @@ export const useAuthStore = create<AuthState>()(
 
         let avatarUrl = current.avatarUrl
         let bannerUrl = current.bannerUrl
+        let mediaError: string | null = null
 
         if (isSupabaseConfigured) {
-          if (photoFile) avatarUrl = (await uploadFile(current.id, 'avatar', photoFile)) ?? avatarUrl
-          if (bannerFile) bannerUrl = (await uploadFile(current.id, 'banner', bannerFile)) ?? bannerUrl
+          // Upload each file independently — a failed banner must not block the text save.
+          if (photoFile) {
+            try { avatarUrl = await uploadFile(current.id, 'avatar', photoFile) }
+            catch (e) { mediaError = e instanceof Error ? e.message : 'Erro ao enviar foto.' }
+          }
+          if (bannerFile) {
+            try { bannerUrl = await uploadFile(current.id, 'banner', bannerFile) }
+            catch (e) { mediaError ??= e instanceof Error ? e.message : 'Erro ao enviar banner.' }
+          }
         } else if (!isExplicitMockMode) {
           throw new Error('Supabase nao esta configurado. Perfil nao pode ser salvo.')
         }
@@ -284,6 +292,9 @@ export const useAuthStore = create<AuthState>()(
             throw new Error(error.message)
           }
         }
+
+        // Text info saved — now surface any media upload failure so the UI shows it.
+        if (mediaError) throw new Error(mediaError)
       },
     }),
     {

@@ -28,17 +28,30 @@ export async function uploadFile(
   userId: string,
   filename: string,
   file: File,
-): Promise<string | null> {
+): Promise<string> {
   const maxBytes = 5 * 1024 * 1024
   const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-  if (file.size > maxBytes || !allowed.includes(file.type)) return null
-  const ext = file.name.split('.').pop() ?? 'jpg'
-  const bucket = filename === 'banner' ? 'banners' : 'avatars'
-  const path = `${userId}/${filename}.${ext}`
-  const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true, contentType: file.type })
-  if (error) {
-    console.error(`[Storage] Upload failed (${bucket}/${path}):`, error.message)
-    return null
+  if (file.size > maxBytes) throw new Error('Arquivo muito grande. Máximo: 5 MB.')
+  if (!allowed.includes(file.type)) throw new Error('Formato inválido. Use JPEG, PNG, WebP ou GIF.')
+
+  // Fixed path without extension — upsert:true always overwrites the SAME object,
+  // so uploading a new photo/banner never leaves orphan files in storage.
+  const path = `${userId}/${filename}`
+  const primaryBucket = filename === 'banner' ? 'banners' : 'avatars'
+
+  // Try dedicated bucket first; fall back to user-media for instances where the
+  // storage migration (20260515143000) hasn't been applied yet.
+  let lastError = ''
+  for (const bucket of [primaryBucket, 'user-media']) {
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, { upsert: true, contentType: file.type })
+    if (!error) {
+      return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl
+    }
+    console.error(`[Storage] ${bucket}/${path}:`, error.message)
+    lastError = error.message
   }
-  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl
+
+  throw new Error(`Falha ao enviar ${filename === 'banner' ? 'banner' : 'foto'}: ${lastError}`)
 }
