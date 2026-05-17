@@ -49,6 +49,7 @@ interface MatchStoreState {
   overrides: Record<string, MatchStatusOverride>
   isLoaded: boolean
   _channel: ReturnType<typeof supabase.channel> | null
+  _initPromise: Promise<void> | null
 
   init: () => Promise<void>
   destroy: () => void
@@ -62,47 +63,56 @@ export const useMatchStore = create<MatchStoreState>()((set, get) => ({
   overrides: {},
   isLoaded: false,
   _channel: null,
+  _initPromise: null,
 
-  init: async () => {
-    if (get().isLoaded) return
-    if (isMockMode) { set({ isLoaded: true }); return }
+  init: () => {
+    const state = get()
+    if (state.isLoaded) return Promise.resolve()
+    if (state._initPromise) return state._initPromise
+    if (isMockMode) { set({ isLoaded: true }); return Promise.resolve() }
 
-    const { data } = await supabase
-      .from('matches')
-      .select('match_code, status, market_status, home_score, away_score, live_minute, winner, locked_at, locked_by, lock_reason, unlocked_at, settled_at, kickoff_utc, match_date, match_time')
-      .not('match_code', 'is', null)
+    const promise = (async () => {
 
-    if (data) {
-      const overrides: Record<string, MatchStatusOverride> = {}
-      for (const row of data as MatchRow[]) {
-        if (!row.match_code) continue
-        overrides[row.match_code] = mapMatchRow(row)
+      const { data } = await supabase
+        .from('matches')
+        .select('match_code, status, market_status, home_score, away_score, live_minute, winner, locked_at, locked_by, lock_reason, unlocked_at, settled_at, kickoff_utc, match_date, match_time')
+        .not('match_code', 'is', null)
+
+      if (data) {
+        const overrides: Record<string, MatchStatusOverride> = {}
+        for (const row of data as MatchRow[]) {
+          if (!row.match_code) continue
+          overrides[row.match_code] = mapMatchRow(row)
+        }
+        set({ overrides, isLoaded: true })
+      } else {
+        set({ isLoaded: true })
       }
-      set({ overrides, isLoaded: true })
-    } else {
-      set({ isLoaded: true })
-    }
 
-    // Realtime: admin altera status → clientes recebem em tempo real
-    const channel = supabase
-      .channel('matches_status_v1')
-      .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'matches' },
-        (payload) => {
-          const row = payload.new as MatchRow
-          if (!row.match_code) return
-          const override = mapMatchRow(row)
-          set(s => ({ overrides: { ...s.overrides, [row.match_code]: override } }))
-        })
-      .subscribe()
+      // Realtime: admin altera status → clientes recebem em tempo real
+      const channel = supabase
+        .channel('matches_status_v1')
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'matches' },
+          (payload) => {
+            const row = payload.new as MatchRow
+            if (!row.match_code) return
+            const override = mapMatchRow(row)
+            set(s => ({ overrides: { ...s.overrides, [row.match_code]: override } }))
+          })
+        .subscribe()
 
-    set({ _channel: channel })
+      set({ _channel: channel })
+    })()
+
+    set({ _initPromise: promise })
+    return promise
   },
 
   destroy: () => {
     const { _channel } = get()
     if (_channel) supabase.removeChannel(_channel)
-    set({ _channel: null, overrides: {}, isLoaded: false })
+    set({ _channel: null, overrides: {}, isLoaded: false, _initPromise: null })
   },
 
   getOverride: (matchCode) => get().overrides[matchCode],
