@@ -70,13 +70,7 @@ async function updateMatchStatus(
   extra?: { homeScore?: number; awayScore?: number; liveMinute?: string; winner?: string; lockReason?: string }
 ) {
   const market = marketStatusFor(status)
-  if (market === 'locked' || market === 'open' || market === 'closed' || market === 'settled') {
-    const rpc = await setMarketStatus(matchCode, market, extra?.lockReason)
-    if (rpc.error) return { message: rpc.error }
-    if (status !== 'finished' && extra?.homeScore === undefined && extra?.awayScore === undefined) return null
-  }
-  const payload: Record<string, unknown> = { status }
-  payload.market_status = marketStatusFor(status)
+  const payload: Record<string, unknown> = { status, market_status: market }
   if (status === 'locked') {
     payload.locked_at = new Date().toISOString()
     payload.lock_reason = extra?.lockReason ?? 'admin_lock'
@@ -100,6 +94,10 @@ async function updateMatchStatus(
     .update(payload)
     .eq('match_code', matchCode)
 
+  if (!error) {
+    // Fire RPC in background — non-critical since direct update already succeeded
+    setMarketStatus(matchCode, market, extra?.lockReason).catch(() => {})
+  }
   return error
 }
 
@@ -109,9 +107,6 @@ async function setMatchResult(
   awayScore: number,
   stage: MatchStage
 ): Promise<{ scored: number; error: string | null }> {
-  const rpc = await settleMatchResult(matchCode, homeScore, awayScore)
-  if (!rpc.error) return { scored: 0, error: null }
-
   const winner =
     homeScore > awayScore ? WC2026_MATCHES.find(m => m.id === matchCode)?.home.code :
     awayScore > homeScore ? WC2026_MATCHES.find(m => m.id === matchCode)?.away.code :
@@ -121,6 +116,9 @@ async function setMatchResult(
     homeScore, awayScore, winner: winner ?? undefined
   })
   if (matchErr) return { scored: 0, error: matchErr.message }
+
+  // Fire settle RPC in background — scoring is handled client-side below
+  settleMatchResult(matchCode, homeScore, awayScore).catch(() => {})
 
   const { data: preds, error: predsErr } = await supabase
     .from('predictions')
@@ -330,6 +328,17 @@ async function lockAllOpenMatches(onAction: (msg: string, ok: boolean) => void) 
     .select('id', { count: 'exact', head: true })
   if (error) onAction(`Erro: ${error.message}`, false)
   else onAction(`✓ ${count ?? 0} partidas → BLOQUEADAS`, true)
+}
+
+async function openAllMatches(onAction: (msg: string, ok: boolean) => void) {
+  if (isMockMode) { onAction('Mock mode: ação não persiste', false); return }
+  const { error, count } = await supabase
+    .from('matches')
+    .update({ status: 'open', market_status: 'open', unlocked_at: new Date().toISOString(), locked_at: null, lock_reason: null, settled_at: null })
+    .in('status', ['scheduled', 'locked'])
+    .select('id', { count: 'exact', head: true })
+  if (error) onAction(`Erro: ${error.message}`, false)
+  else onAction(`✓ ${count ?? 0} partidas → ABERTAS`, true)
 }
 
 // ─── Export CSV ───────────────────────────────────────────────────────────────
@@ -636,6 +645,9 @@ function AdminMobile() {
       </div>
 
       <div className="px-4 pt-3 space-y-2">
+        <button onClick={() => openAllMatches(showToast)} className="btn-ghost w-full justify-center text-[10px] border-green/60 text-green">
+          ABRIR TODAS AS APOSTAS
+        </button>
         <button onClick={() => lockAllOpenMatches(showToast)} className="btn-ghost w-full justify-center text-[10px]">
           BLOQUEAR TODAS AS APOSTAS ABERTAS
         </button>
@@ -719,8 +731,11 @@ function AdminDesktop() {
           </div>
           <div className="flex gap-2">
             <button onClick={() => exportRankingCsv()} className="btn-ghost">EXPORTAR CSV ↓</button>
+            <button onClick={() => openAllMatches(showToast)} className="btn-ghost border-green/60 text-green">
+              ABRIR TODAS
+            </button>
             <button onClick={() => lockAllOpenMatches(showToast)} className="btn-ghost border-yellow/60">
-              BLOQUEAR TODAS APOSTAS
+              BLOQUEAR TODAS
             </button>
           </div>
         </div>
@@ -822,6 +837,12 @@ function AdminDesktop() {
                   </button>
                 ))}
               </div>
+              <button
+                onClick={() => openAllMatches(showToast)}
+                className="btn-ghost w-full justify-center text-[10px] border-green/60 text-green mb-2"
+              >
+                ABRIR TODAS AS APOSTAS
+              </button>
               <button
                 onClick={() => lockAllOpenMatches(showToast)}
                 className="btn-ghost w-full justify-center text-[10px] border-yellow/60"
