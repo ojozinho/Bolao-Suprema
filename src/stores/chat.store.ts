@@ -20,7 +20,6 @@ interface MessageRow {
   id: string; user_id: string; channel_id: string | null
   text: string | null; type: string | null; gif_url: string | null
   poll_data: Record<string, unknown> | null; reaction: string | null; created_at: string
-  deleted_at?: string | null; is_important?: boolean | null
   users?: UserRow | null
 }
 
@@ -71,7 +70,7 @@ function mapRow(row: MessageRow, myUserId?: string): ChatMessage {
     color:     u?.color    ?? '#777',
     avatarUrl: u?.avatarUrl,
     time:      new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    text:      row.deleted_at ? '[mensagem removida pela administracao]' : (row.text ?? ''),
+    text:      row.text ?? '',
     type:      (row.type as ChatMessage['type']) ?? 'text',
     gifUrl:    row.gif_url  ?? undefined,
     poll:      row.poll_data as ChatMessage['poll'],
@@ -147,15 +146,17 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
 
     // 1. Load last 200 messages (ordered asc for display)
-    const { data: rows } = await supabase
+    const { data: rows, error: fetchError } = await supabase
       .from('chat_messages')
       .select(`
-        id, user_id, channel_id, text, type, gif_url, poll_data, reaction, created_at, deleted_at, is_important,
+        id, user_id, channel_id, text, type, gif_url, poll_data, reaction, created_at,
         users ( id, first_name, last_name, dept, initials, color, avatar_url )
       `)
       .eq('channel_id', 'geral')
       .order('created_at', { ascending: true })
       .limit(200)
+
+    if (fetchError) console.error('[Chat] init fetch error:', fetchError.message)
 
     if (rows) {
       for (const row of rows) {
@@ -369,7 +370,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
   },
 
-  // ── deleteMessage (admin + own) ───────────────────────────────────────────
+  // ── deleteMessage (admin + own — RLS enforces ownership) ─────────────────
 
   deleteMessage: async (id) => {
     if (isMockMode) {
@@ -378,19 +379,13 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
 
     // Optimistic remove
-    set(s => {
-      const messages = s.messages.filter(m => m.id !== id)
-      return { messages }
-    })
-    // If this was the pinned message, unpin it
-    if (get().pinnedId === id) {
-      set({ pinnedId: null })
-    }
+    set(s => ({ messages: s.messages.filter(m => m.id !== id) }))
+    if (get().pinnedId === id) set({ pinnedId: null })
 
-    const { error } = await supabase.rpc('moderate_chat_message', { p_message_id: id, p_action: 'delete' })
+    const { error } = await supabase.from('chat_messages').delete().eq('id', id)
     if (error) {
       console.error('[Chat] Erro ao deletar mensagem:', error.message)
-      set(s => ({ lastError: 'Erro ao deletar mensagem.' }))
+      set({ lastError: 'Erro ao deletar mensagem.' })
     }
   },
 }))

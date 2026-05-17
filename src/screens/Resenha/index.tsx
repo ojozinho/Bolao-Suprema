@@ -9,31 +9,58 @@ import { useIsDesktop } from '@/hooks/useBreakpoint'
 import type { ChatMessage, ChatPoll } from '@/types'
 
 // ─── GIF API ─────────────────────────────────────────────────────────────────
+// Primary: Tenor v1 (public demo key — free, no auth required)
+// Fallback: Tenor v2 (if VITE_TENOR_KEY is set) or Giphy
 
-const TENOR_KEY  = import.meta.env.VITE_TENOR_KEY as string | undefined
-const GIPHY_KEY  = 'dc6zaTOxFJmzC'
-const DRAFT_KEY  = 'resenha-draft-geral'
+const TENOR_V1_KEY = 'LIVDSRZULELA'
+const TENOR_V2_KEY = import.meta.env.VITE_TENOR_KEY as string | undefined
+const DRAFT_KEY    = 'resenha-draft-geral'
 
 interface GifResult { id: string; url: string; preview: string }
 
 async function fetchGifs(query: string): Promise<GifResult[]> {
-  if (TENOR_KEY) {
+  const q = query.trim()
+
+  // ── Tenor v1 (primary, always available) ──────────────────────────────────
+  try {
+    const base   = 'https://g.tenor.com/v1'
     const params = new URLSearchParams({
-      key: TENOR_KEY, client_key: 'bolao_suprema',
-      limit: '24', contentfilter: 'medium', media_filter: 'gif,tinygif',
+      key: TENOR_V1_KEY, limit: '24', contentfilter: 'medium', media_filter: 'minimal',
     })
-    if (query.trim()) params.set('q', query.trim())
-    const base = 'https://tenor.googleapis.com/v2'
-    const url   = query.trim() ? `${base}/search?${params}` : `${base}/featured?${params}`
+    if (q) params.set('q', q)
+    const url  = q ? `${base}/search?${params}` : `${base}/trending?${params}`
+    const res  = await fetch(url)
+    if (res.ok) {
+      const data = await res.json() as {
+        results: { id: string; media: { gif?: { url: string }; tinygif?: { url: string } }[] }[]
+      }
+      const gifs = (data.results ?? []).map(r => ({
+        id:      r.id,
+        url:     r.media[0]?.gif?.url ?? '',
+        preview: r.media[0]?.tinygif?.url ?? r.media[0]?.gif?.url ?? '',
+      })).filter(g => g.url)
+      if (gifs.length > 0) return gifs
+    }
+  } catch { /* fall through */ }
+
+  // ── Tenor v2 (if custom key set) ──────────────────────────────────────────
+  if (TENOR_V2_KEY) {
     try {
+      const params = new URLSearchParams({
+        key: TENOR_V2_KEY, client_key: 'bolao_suprema',
+        limit: '24', contentfilter: 'medium', media_filter: 'gif,tinygif',
+      })
+      if (q) params.set('q', q)
+      const base = 'https://tenor.googleapis.com/v2'
+      const url  = q ? `${base}/search?${params}` : `${base}/featured?${params}`
       const res  = await fetch(url)
       if (res.ok) {
         const data = await res.json() as {
           results: { id: string; media_formats: { gif?: { url: string }; tinygif?: { url: string } } }[]
         }
         const gifs = (data.results ?? []).map(r => ({
-          id: r.id,
-          url: r.media_formats.gif?.url ?? '',
+          id:      r.id,
+          url:     r.media_formats.gif?.url ?? '',
           preview: r.media_formats.tinygif?.url ?? r.media_formats.gif?.url ?? '',
         })).filter(g => g.url)
         if (gifs.length > 0) return gifs
@@ -41,22 +68,7 @@ async function fetchGifs(query: string): Promise<GifResult[]> {
     } catch { /* fall through */ }
   }
 
-  const q   = query.trim()
-  const url = q
-    ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(q)}&limit=24&rating=pg-13`
-    : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=24&rating=pg-13`
-  try {
-    const res  = await fetch(url)
-    if (!res.ok) return []
-    const data = await res.json() as {
-      data: { id: string; images: { original: { url: string }; fixed_height_small: { url: string } } }[]
-    }
-    return (data.data ?? []).map(g => ({
-      id: g.id,
-      url: g.images.original.url,
-      preview: g.images.fixed_height_small?.url ?? g.images.original.url,
-    })).filter(g => g.url)
-  } catch { return [] }
+  return []
 }
 
 // ─── GIF Picker ───────────────────────────────────────────────────────────────
