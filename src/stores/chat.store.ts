@@ -239,9 +239,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             }),
           }))
         })
-      // Deleted messages
+      // Deleted messages (no filter — channel_id not in OLD record without REPLICA IDENTITY FULL)
       .on('postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'chat_messages', filter: 'channel_id=eq.geral' },
+        { event: 'DELETE', schema: 'public', table: 'chat_messages' },
         (payload) => {
           const id = (payload.old as { id: string }).id
           set(s => {
