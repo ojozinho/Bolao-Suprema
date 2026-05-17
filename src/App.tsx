@@ -60,24 +60,20 @@ function RequireAuth() {
 
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (!profileComplete && pathname !== '/profile') return <Navigate to="/profile" replace />
-  if (user?.participantStatus === 'pending' && !['/profile', '/regulamento'].includes(pathname)) return <ParticipantStatusScreen status="pending" />
-  if ((user?.participantStatus === 'blocked' || user?.participantStatus === 'removed') && pathname !== '/profile') return <ParticipantStatusScreen status={user.participantStatus} />
+  if (user?.participantStatus === 'blocked' && pathname !== '/profile') return <ParticipantStatusScreen />
 
   return <Outlet />
 }
 
-function ParticipantStatusScreen({ status }: { status: 'pending' | 'blocked' | 'removed' }) {
-  const copy = {
-    pending: ['Cadastro em aprovacao', 'Seu acesso ao bolao ja foi criado, mas um admin precisa aprovar sua participacao.'],
-    blocked: ['Participante bloqueado', 'Seu acesso a palpites e Resenha esta bloqueado. Procure T.I. ou o admin do bolao.'],
-    removed: ['Participante removido', 'Seu usuario foi removido do bolao. Procure T.I. se isso parecer errado.'],
-  }[status]
+function ParticipantStatusScreen() {
   return (
     <div className="min-h-dvh bg-paper flex items-center justify-center p-6">
       <div className="border-2 border-ink p-6 max-w-md">
-        <div className="font-mono text-[10px] tracking-eyebrow text-ink-3">STATUS DO PARTICIPANTE</div>
-        <h1 className="font-display text-4xl mt-2">{copy[0]}</h1>
-        <p className="font-mono text-[12px] text-ink-3 mt-3 leading-relaxed">{copy[1]}</p>
+        <div className="font-mono text-[10px] tracking-eyebrow text-ink-3">ACESSO BLOQUEADO</div>
+        <h1 className="font-display text-4xl mt-2">Participante bloqueado</h1>
+        <p className="font-mono text-[12px] text-ink-3 mt-3 leading-relaxed">
+          Seu acesso a palpites e Resenha esta bloqueado. Procure T.I. ou o admin do bolao.
+        </p>
       </div>
     </div>
   )
