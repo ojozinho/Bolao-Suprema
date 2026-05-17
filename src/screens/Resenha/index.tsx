@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/shared/Avatar'
@@ -8,39 +8,25 @@ import { useChatStore } from '@/stores/chat.store'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
 import type { ChatMessage, ChatPoll } from '@/types'
 
-// ─── Tenor GIF API ─────────────────────────────────────────────────────────────
+// ─── GIF API ─────────────────────────────────────────────────────────────────
 
-const TENOR_KEY = import.meta.env.VITE_TENOR_KEY as string | undefined
-const GIPHY_KEY = 'dc6zaTOxFJmzC' // public beta key (fallback gratuito)
+const TENOR_KEY  = import.meta.env.VITE_TENOR_KEY as string | undefined
+const GIPHY_KEY  = 'dc6zaTOxFJmzC'
+const DRAFT_KEY  = 'resenha-draft-geral'
 
-interface GifResult {
-  id: string
-  url: string
-  preview: string
-}
-
-const GIF_FALLBACKS: GifResult[] = [
-  { id: 'local-1', url: 'https://media.giphy.com/media/3o6Zt481isNVuQI1l6/giphy.gif', preview: 'https://media.giphy.com/media/3o6Zt481isNVuQI1l6/200.gif' },
-  { id: 'local-2', url: 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif', preview: 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/200.gif' },
-  { id: 'local-3', url: 'https://media.giphy.com/media/111ebonMs90YLu/giphy.gif', preview: 'https://media.giphy.com/media/111ebonMs90YLu/200.gif' },
-  { id: 'local-4', url: 'https://media.giphy.com/media/26u4cqiYI30juCOGY/giphy.gif', preview: 'https://media.giphy.com/media/26u4cqiYI30juCOGY/200.gif' },
-]
+interface GifResult { id: string; url: string; preview: string }
 
 async function fetchGifs(query: string): Promise<GifResult[]> {
-  // Tenor v2 se tiver chave configurada
   if (TENOR_KEY) {
     const params = new URLSearchParams({
-      key: TENOR_KEY,
-      client_key: 'bolao_suprema',
-      limit: '20',
-      contentfilter: 'medium',
-      media_filter: 'gif,tinygif',
+      key: TENOR_KEY, client_key: 'bolao_suprema',
+      limit: '24', contentfilter: 'medium', media_filter: 'gif,tinygif',
     })
     if (query.trim()) params.set('q', query.trim())
     const base = 'https://tenor.googleapis.com/v2'
-    const endpoint = query.trim() ? `${base}/search?${params}` : `${base}/featured?${params}`
+    const url   = query.trim() ? `${base}/search?${params}` : `${base}/featured?${params}`
     try {
-      const res = await fetch(endpoint)
+      const res  = await fetch(url)
       if (res.ok) {
         const data = await res.json() as {
           results: { id: string; media_formats: { gif?: { url: string }; tinygif?: { url: string } } }[]
@@ -52,38 +38,34 @@ async function fetchGifs(query: string): Promise<GifResult[]> {
         })).filter(g => g.url)
         if (gifs.length > 0) return gifs
       }
-    } catch { /* fallthrough to Giphy */ }
+    } catch { /* fall through */ }
   }
 
-  // Giphy como provedor padrão
-  const q = query.trim()
-  const endpoint = q
-    ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(q)}&limit=20&rating=pg-13`
-    : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=20&rating=pg-13`
+  const q   = query.trim()
+  const url = q
+    ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(q)}&limit=24&rating=pg-13`
+    : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=24&rating=pg-13`
   try {
-    const res = await fetch(endpoint)
-    if (!res.ok) return GIF_FALLBACKS
+    const res  = await fetch(url)
+    if (!res.ok) return []
     const data = await res.json() as {
       data: { id: string; images: { original: { url: string }; fixed_height_small: { url: string } } }[]
     }
-    const results = (data.data ?? []).map(g => ({
+    return (data.data ?? []).map(g => ({
       id: g.id,
       url: g.images.original.url,
       preview: g.images.fixed_height_small?.url ?? g.images.original.url,
     })).filter(g => g.url)
-    return results.length > 0 ? results : GIF_FALLBACKS
-  } catch {
-    return GIF_FALLBACKS
-  }
+  } catch { return [] }
 }
 
-// ─── GIF Picker ────────────────────────────────────────────────────────────────
+// ─── GIF Picker ───────────────────────────────────────────────────────────────
 
 function GifPicker({ onSelect, onClose }: { onSelect: (url: string) => void; onClose: () => void }) {
-  const [query, setQuery] = useState('')
-  const [gifs, setGifs] = useState<GifResult[]>([])
+  const [query, setQuery]     = useState('')
+  const [gifs, setGifs]       = useState<GifResult[]>([])
   const [loading, setLoading] = useState(true)
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
     setLoading(true)
@@ -91,56 +73,46 @@ function GifPicker({ onSelect, onClose }: { onSelect: (url: string) => void; onC
   }, [])
 
   useEffect(() => {
-    clearTimeout(timerRef.current)
-    if (!query.trim()) {
-      setLoading(true)
-      fetchGifs('').then(g => { setGifs(g); setLoading(false) })
-      return
-    }
-    timerRef.current = setTimeout(() => {
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => {
       setLoading(true)
       fetchGifs(query).then(g => { setGifs(g); setLoading(false) })
-    }, 450)
-    return () => clearTimeout(timerRef.current)
+    }, query.trim() ? 420 : 0)
+    return () => clearTimeout(timer.current)
   }, [query])
 
   return (
     <motion.div
-      initial={{ height: 0 }}
-      animate={{ height: 300 }}
-      exit={{ height: 0 }}
+      initial={{ height: 0 }} animate={{ height: 300 }} exit={{ height: 0 }}
       transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-      className="overflow-hidden border-t border-line bg-paper-deep flex-shrink-0"
+      className="overflow-hidden border-t border-hairline bg-paper-deep flex-shrink-0"
     >
       <div className="flex items-center gap-2 px-3 py-2 border-b border-hairline bg-paper">
-        <span className="text-ink-3 text-sm leading-none font-mono">SRC</span>
+        <span className="font-mono text-[10px] text-ink-4 flex-shrink-0">GIF</span>
         <input
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="buscar GIF..."
+          value={query} onChange={e => setQuery(e.target.value)}
+          placeholder="pesquisar gif..."
           autoFocus
           className="flex-1 bg-transparent font-sans text-[13px] outline-none placeholder:text-ink-4"
         />
-        <button onClick={onClose} className="font-mono text-[10px] text-ink-3 hover:text-ink px-1">
-          ✕
-        </button>
+        <button onClick={onClose} className="font-mono text-[10px] text-ink-3 hover:text-red px-1 flex-shrink-0">✕</button>
       </div>
-      <div className="h-[calc(300px-44px)] overflow-y-auto overscroll-contain">
+      <div className="h-[calc(300px-41px)] overflow-y-auto overscroll-contain">
         {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <span className="font-mono text-[11px] text-ink-3 animate-pulse">CARREGANDO...</span>
+          <div className="h-full flex items-center justify-center">
+            <span className="font-mono text-[10px] text-ink-4 animate-pulse">BUSCANDO...</span>
           </div>
         ) : gifs.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <span className="font-mono text-[11px] text-ink-3">NENHUM GIF ENCONTRADO</span>
+          <div className="h-full flex items-center justify-center">
+            <span className="font-mono text-[10px] text-ink-4">NENHUM GIF ENCONTRADO</span>
           </div>
         ) : (
-          <div className="grid grid-cols-3 md:grid-cols-4 gap-1 p-2">
+          <div className="grid grid-cols-3 md:grid-cols-4 gap-0.5 p-1">
             {gifs.map(g => (
               <button
                 key={g.id}
-                onClick={() => onSelect(g.url)}
-                className="aspect-square overflow-hidden bg-paper-deep hover:opacity-75 transition-opacity"
+                onClick={() => { onSelect(g.url); onClose() }}
+                className="aspect-square overflow-hidden bg-hairline hover:opacity-80 transition-opacity"
               >
                 <img src={g.preview} alt="" className="w-full h-full object-cover" loading="lazy" />
               </button>
@@ -152,19 +124,11 @@ function GifPicker({ onSelect, onClose }: { onSelect: (url: string) => void; onC
   )
 }
 
-// ─── Poll Modal ─────────────────────────────────────────────────────────────────
+// ─── Poll Modal ───────────────────────────────────────────────────────────────
 
 function PollModal({ onCreate, onClose }: { onCreate: (poll: ChatPoll) => void; onClose: () => void }) {
   const [question, setQuestion] = useState('')
-  const [options, setOptions] = useState(['', ''])
-
-  const updateOption = (i: number, val: string) =>
-    setOptions(prev => prev.map((o, idx) => (idx === i ? val : o)))
-
-  const removeOption = (i: number) => {
-    if (options.length <= 2) return
-    setOptions(prev => prev.filter((_, idx) => idx !== i))
-  }
+  const [options, setOptions]   = useState(['', ''])
 
   const valid = question.trim().length > 0 && options.filter(o => o.trim()).length >= 2
 
@@ -172,87 +136,61 @@ function PollModal({ onCreate, onClose }: { onCreate: (poll: ChatPoll) => void; 
     if (!valid) return
     onCreate({
       question: question.trim(),
-      options: options
-        .filter(o => o.trim())
-        .map((text, i) => ({ id: `o${i + 1}`, text: text.trim() })),
+      options: options.filter(o => o.trim()).map((text, i) => ({ id: `o${i + 1}`, text: text.trim() })),
       votes: {},
     })
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-ink/50 px-0 md:px-4"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-ink/60 px-0 md:px-4"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <motion.div
-        initial={{ y: 40, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 40, opacity: 0 }}
+        initial={{ y: 48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 48, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-        className="w-full md:max-w-md bg-paper border-2 border-ink p-6 md:p-6"
+        className="w-full md:max-w-md bg-paper border-2 border-ink p-6"
       >
         <div className="flex items-center justify-between mb-5">
-          <p className="font-display text-xl tracking-wide">CRIAR ENQUETE</p>
-          <button onClick={onClose} className="font-mono text-[10px] text-ink-3 hover:text-ink">
-            FECHAR
-          </button>
+          <p className="font-display text-2xl">CRIAR ENQUETE</p>
+          <button onClick={onClose} className="font-mono text-[10px] text-ink-3 hover:text-ink">FECHAR</button>
         </div>
-
         <div className="space-y-3">
           <input
-            value={question}
-            onChange={e => setQuestion(e.target.value)}
+            value={question} onChange={e => setQuestion(e.target.value)}
             placeholder="Qual é a pergunta?"
             className="w-full bg-paper-deep border border-line px-3 py-2.5 font-sans text-[14px] outline-none focus:border-ink placeholder:text-ink-4"
           />
-          <p className="font-mono text-[9px] text-ink-4 tracking-wide">OPÇÕES (mín. 2, máx. 4)</p>
-          <div className="space-y-2">
-            {options.map((opt, i) => (
-              <div key={i} className="flex gap-2 items-center">
-                <span className="font-mono text-[10px] text-ink-4 w-4 text-right">{i + 1}</span>
-                <input
-                  value={opt}
-                  onChange={e => updateOption(i, e.target.value)}
-                  placeholder={`Opção ${i + 1}`}
-                  className="flex-1 bg-paper-deep border border-line px-3 py-2 font-sans text-[13px] outline-none focus:border-ink placeholder:text-ink-4"
-                />
-                {options.length > 2 && (
-                  <button
-                    onClick={() => removeOption(i)}
-                    className="font-mono text-[12px] text-ink-4 hover:text-red w-5 flex-shrink-0"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
+          <p className="font-mono text-[9px] text-ink-4 tracking-eyebrow">OPÇÕES (mín. 2, máx. 4)</p>
+          {options.map((opt, i) => (
+            <div key={i} className="flex gap-2 items-center">
+              <span className="font-mono text-[10px] text-ink-4 w-4 text-right flex-shrink-0">{i + 1}</span>
+              <input
+                value={opt} onChange={e => setOptions(prev => prev.map((o, idx) => idx === i ? e.target.value : o))}
+                placeholder={`Opção ${i + 1}`}
+                className="flex-1 bg-paper-deep border border-line px-3 py-2 font-sans text-[13px] outline-none focus:border-ink placeholder:text-ink-4"
+              />
+              {options.length > 2 && (
+                <button onClick={() => setOptions(prev => prev.filter((_, idx) => idx !== i))}
+                  className="font-mono text-[12px] text-ink-4 hover:text-red w-5 flex-shrink-0">×</button>
+              )}
+            </div>
+          ))}
           {options.length < 4 && (
-            <button
-              onClick={() => setOptions(prev => [...prev, ''])}
-              className="font-mono text-[10px] text-ink-3 hover:text-ink"
-            >
+            <button onClick={() => setOptions(prev => [...prev, ''])}
+              className="font-mono text-[10px] text-ink-3 hover:text-ink">
               + ADICIONAR OPÇÃO
             </button>
           )}
         </div>
-
         <div className="flex gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="flex-1 border border-line font-mono text-[11px] py-2.5 hover:border-ink transition-colors"
-          >
+          <button onClick={onClose}
+            className="flex-1 border border-line font-mono text-[11px] py-2.5 hover:border-ink transition-colors">
             CANCELAR
           </button>
-          <button
-            onClick={handleCreate}
-            disabled={!valid}
-            className="flex-1 btn-yellow py-2.5 text-[11px] disabled:opacity-40"
-          >
+          <button onClick={handleCreate} disabled={!valid}
+            className="flex-1 btn-yellow py-2.5 text-[11px] disabled:opacity-40">
             CRIAR ENQUETE
           </button>
         </div>
@@ -261,156 +199,126 @@ function PollModal({ onCreate, onClose }: { onCreate: (poll: ChatPoll) => void; 
   )
 }
 
-// ─── Message Bubbles ────────────────────────────────────────────────────────────
+// ─── Message components ───────────────────────────────────────────────────────
 
-function UserAvatar({ m }: { m: ChatMessage }) {
-  const navigate = useNavigate()
+function UserAvatar({ m, onClick }: { m: ChatMessage; onClick?: () => void }) {
   return (
     <button
-      onClick={() => !m.isYou && navigate(`/u/${m.userId}`)}
-      className={cn('flex-shrink-0 mt-1 rounded-full', !m.isYou && 'hover:opacity-80 transition-opacity cursor-pointer')}
-      disabled={m.isYou}
+      onClick={onClick}
+      disabled={!onClick}
+      className={cn('flex-shrink-0 mt-0.5', onClick && 'hover:opacity-75 transition-opacity cursor-pointer')}
     >
-      <Avatar initials={m.initials} color={m.color} src={m.avatarUrl} size={30} />
+      <Avatar initials={m.initials} color={m.color} src={m.avatarUrl} size={28} />
     </button>
   )
 }
 
-function TextBubble({ m }: { m: ChatMessage }) {
-  const navigate = useNavigate()
+function MsgHeader({ m, navigate }: { m: ChatMessage; navigate: (path: string) => void }) {
   return (
-    <div className={cn('flex gap-2.5', m.isYou ? 'flex-row-reverse' : '')}>
-      <UserAvatar m={m} />
-      <div className={cn('max-w-[75%] flex flex-col gap-1', m.isYou ? 'items-end' : 'items-start')}>
-        {!m.isYou && (
-          <button
-            onClick={() => navigate(`/u/${m.userId}`)}
-            className="font-mono text-[10px] text-ink-3 hover:text-ink transition-colors text-left"
-          >
-            {m.who} · {m.dept} · {m.time}
-          </button>
-        )}
-        <div
-          className={cn(
-            'px-3 py-2 text-[13px] leading-snug break-words',
-            m.isYou
-              ? 'bg-yellow text-ink rounded-[14px_4px_14px_14px]'
-              : 'bg-paper-deep text-ink rounded-[4px_14px_14px_14px]'
-          )}
-        >
-          {m.text}
-        </div>
-        {m.isYou && (
-          <span className="font-mono text-[9px] text-ink-4">{m.time}</span>
-        )}
-        {m.reaction && (
-          <div className="flex items-center gap-1 border border-hairline px-2 py-0.5 rounded-full text-[12px]">
-            <span>{m.reaction}</span>
-          </div>
-        )}
-      </div>
-    </div>
+    <button
+      onClick={() => navigate(`/u/${m.userId}`)}
+      className="font-mono text-[10px] text-ink-3 hover:text-ink transition-colors text-left leading-none mb-1"
+    >
+      <span className="font-bold text-ink-2">{m.who}</span>
+      {m.dept && <span className="text-ink-4"> · {m.dept}</span>}
+      <span className="text-ink-4"> · {m.time}</span>
+    </button>
   )
 }
 
-function GifBubble({ m }: { m: ChatMessage }) {
+function TextBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
   const navigate = useNavigate()
   return (
-    <div className={cn('flex gap-2.5', m.isYou ? 'flex-row-reverse' : '')}>
-      <UserAvatar m={m} />
-      <div className={cn('max-w-[60%] flex flex-col gap-1', m.isYou ? 'items-end' : 'items-start')}>
-        {!m.isYou && (
-          <button
-            onClick={() => navigate(`/u/${m.userId}`)}
-            className="font-mono text-[10px] text-ink-3 hover:text-ink transition-colors text-left"
-          >
-            {m.who} · {m.dept} · {m.time}
-          </button>
-        )}
-        <div
-          className={cn(
-            'overflow-hidden',
-            m.isYou ? 'rounded-[14px_4px_14px_14px]' : 'rounded-[4px_14px_14px_14px]'
-          )}
-        >
-          <img
-            src={m.gifUrl}
-            alt="GIF"
-            className="max-w-full max-h-52 object-contain block"
-            loading="lazy"
-          />
+    <div className={cn('flex gap-2', m.isYou ? 'flex-row-reverse' : '')}>
+      {!m.isYou && (
+        grouped
+          ? <div className="w-7 flex-shrink-0" />
+          : <UserAvatar m={m} onClick={() => navigate(`/u/${m.userId}`)} />
+      )}
+      <div className={cn('max-w-[78%] md:max-w-[65%] flex flex-col gap-0.5', m.isYou ? 'items-end' : 'items-start')}>
+        {!m.isYou && !grouped && <MsgHeader m={m} navigate={navigate} />}
+        <div className={cn(
+          'px-3 py-2 text-[13px] leading-snug break-words whitespace-pre-wrap',
+          m.isYou
+            ? 'bg-yellow text-ink rounded-[14px_4px_14px_14px]'
+            : 'bg-paper-deep text-ink rounded-[4px_14px_14px_14px]',
+        )}>
+          {m.text}
         </div>
         {m.isYou && <span className="font-mono text-[9px] text-ink-4">{m.time}</span>}
       </div>
+      {m.isYou && <div className="w-7 flex-shrink-0" />}
     </div>
   )
 }
 
-function PollBubble({ m, userVotes, onVote }: {
-  m: ChatMessage
-  userVotes: Record<string, string>
-  onVote: (optionId: string) => void
-}) {
-  const poll = m.poll!
-  const myVote = userVotes[m.id]
-  const hasVoted = !!myVote
-
-  const totalVotes = Object.keys(poll.votes).length
-
+function GifBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
   const navigate = useNavigate()
   return (
-    <div className="flex gap-2.5">
-      <UserAvatar m={m} />
+    <div className={cn('flex gap-2', m.isYou ? 'flex-row-reverse' : '')}>
+      {!m.isYou && (
+        grouped
+          ? <div className="w-7 flex-shrink-0" />
+          : <UserAvatar m={m} onClick={() => navigate(`/u/${m.userId}`)} />
+      )}
+      <div className={cn('max-w-[60%] flex flex-col gap-0.5', m.isYou ? 'items-end' : 'items-start')}>
+        {!m.isYou && !grouped && <MsgHeader m={m} navigate={navigate} />}
+        <div className={cn('overflow-hidden', m.isYou ? 'rounded-[14px_4px_14px_14px]' : 'rounded-[4px_14px_14px_14px]')}>
+          <img src={m.gifUrl} alt="GIF" className="max-w-full max-h-52 object-contain block" loading="lazy" />
+        </div>
+        {m.isYou && <span className="font-mono text-[9px] text-ink-4">{m.time}</span>}
+      </div>
+      {m.isYou && <div className="w-7 flex-shrink-0" />}
+    </div>
+  )
+}
+
+function PollBubble({ m, userId, onVote }: { m: ChatMessage; userId?: string; onVote: (optId: string) => void }) {
+  const navigate = useNavigate()
+  const poll      = m.poll!
+  const myVote    = userId ? poll.votes[userId] : null
+  const hasVoted  = !!myVote
+  const total     = Object.keys(poll.votes).length
+
+  return (
+    <div className="flex gap-2">
+      <UserAvatar m={m} onClick={() => navigate(`/u/${m.userId}`)} />
       <div className="flex-1 max-w-sm">
-        <button
-          onClick={() => navigate(`/u/${m.userId}`)}
-          className="font-mono text-[10px] text-ink-3 hover:text-ink transition-colors block mb-2 text-left"
-        >
-          {m.who} · {m.dept} · {m.time}
-        </button>
-        <div className="border-2 border-ink bg-paper p-4 shadow-card">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-base leading-none font-mono">≡</span>
-            <p className="font-display text-[14px] tracking-wide text-ink">{poll.question}</p>
-          </div>
+        <MsgHeader m={m} navigate={navigate} />
+        <div className="border-2 border-ink bg-paper p-4">
+          <p className="font-display text-[14px] leading-tight mb-4">{poll.question}</p>
           <div className="space-y-2">
             {poll.options.map(opt => {
-              const count = Object.values(poll.votes).filter(v => v === opt.id).length
-              const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0
-              const isMyPick = myVote === opt.id
+              const count     = Object.values(poll.votes).filter(v => v === opt.id).length
+              const pct       = total > 0 ? Math.round((count / total) * 100) : 0
+              const isMyPick  = myVote === opt.id
               return (
-                <button
-                  key={opt.id}
+                <button key={opt.id}
                   onClick={() => !hasVoted && onVote(opt.id)}
                   disabled={hasVoted && !isMyPick}
                   className={cn(
                     'w-full text-left relative overflow-hidden border transition-colors',
                     isMyPick ? 'border-ink' : 'border-hairline',
-                    !hasVoted ? 'hover:border-line cursor-pointer' : 'cursor-default'
+                    !hasVoted && 'hover:border-line cursor-pointer',
                   )}
                 >
                   <div
-                    className={cn(
-                      'absolute inset-0 transition-all duration-700',
-                      isMyPick ? 'bg-yellow/50' : 'bg-paper-deep/70'
-                    )}
+                    className={cn('absolute inset-0 transition-all duration-700', isMyPick ? 'bg-yellow/50' : 'bg-paper-deep/70')}
                     style={{ width: hasVoted ? `${pct}%` : '0%' }}
                   />
                   <div className="relative flex items-center justify-between px-3 py-2.5">
-                    <span className={cn('font-sans text-[12px]', isMyPick ? 'font-bold text-ink' : 'text-ink-2')}>
+                    <span className={cn('font-sans text-[12px]', isMyPick ? 'font-bold' : 'text-ink-2')}>
                       {isMyPick && '✓ '}{opt.text}
                     </span>
-                    {hasVoted && (
-                      <span className="font-mono text-[10px] text-ink-3 ml-2 flex-shrink-0">{pct}%</span>
-                    )}
+                    {hasVoted && <span className="font-mono text-[10px] text-ink-3 ml-2 flex-shrink-0">{pct}%</span>}
                   </div>
                 </button>
               )
             })}
           </div>
           <p className="font-mono text-[10px] text-ink-4 mt-3">
-            {totalVotes} {totalVotes === 1 ? 'voto' : 'votos'}
-            {!hasVoted && ' · clique para votar'}
+            {total} {total === 1 ? 'voto' : 'votos'}
+            {!hasVoted && ' · toque para votar'}
           </p>
         </div>
       </div>
@@ -418,151 +326,187 @@ function PollBubble({ m, userVotes, onVote }: {
   )
 }
 
-function MessageRow({ m, userVotes, onVote }: {
-  m: ChatMessage
-  userVotes: Record<string, string>
-  onVote: (optionId: string) => void
-}) {
-  if (m.type === 'poll' && m.poll) return <PollBubble m={m} userVotes={userVotes} onVote={onVote} />
-  if (m.type === 'gif' && m.gifUrl) return <GifBubble m={m} />
-  return <TextBubble m={m} />
+function DateSeparator({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 py-1">
+      <div className="flex-1 h-px bg-hairline" />
+      <span className="font-mono text-[9px] text-ink-4 tracking-eyebrow">{label}</span>
+      <div className="flex-1 h-px bg-hairline" />
+    </div>
+  )
 }
 
-// ─── Chat Input ─────────────────────────────────────────────────────────────────
+function dayLabel(iso: string): string {
+  const d      = new Date(iso)
+  const today  = new Date()
+  const yest   = new Date(today); yest.setDate(today.getDate() - 1)
+  if (d.toDateString() === today.toDateString()) return 'HOJE'
+  if (d.toDateString() === yest.toDateString())  return 'ONTEM'
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).toUpperCase()
+}
+
+// ─── Chat Input ───────────────────────────────────────────────────────────────
+
+const MAX_CHARS = 1000
 
 function ChatInput({
-  onSend,
-  onGifToggle,
-  gifActive,
+  onSend, onGifToggle, gifActive,
 }: {
   onSend: (text: string) => void
   onGifToggle: () => void
   gifActive: boolean
 }) {
-  const [text, setText] = useState('')
+  const [text, setText] = useState(() => {
+    try { return localStorage.getItem(DRAFT_KEY) ?? '' } catch { return '' }
+  })
+
+  const handleChange = (v: string) => {
+    if (v.length > MAX_CHARS) return
+    setText(v)
+    try { localStorage.setItem(DRAFT_KEY, v) } catch { /* ok */ }
+  }
 
   const handleSend = () => {
     if (!text.trim()) return
     onSend(text.trim())
     setText('')
+    try { localStorage.removeItem(DRAFT_KEY) } catch { /* ok */ }
   }
 
   return (
-    <div className="flex items-center gap-2 border-t border-line px-3 py-2.5 bg-paper flex-shrink-0">
-      <button
-        onClick={onGifToggle}
-        className={cn(
-          'flex-shrink-0 font-mono text-[10px] font-bold px-2.5 py-1.5 border transition-colors',
-          gifActive
-            ? 'bg-ink text-paper border-ink'
-            : 'border-line text-ink-3 hover:border-ink hover:text-ink'
-        )}
-        title="Enviar GIF"
-      >
-        GIF
-      </button>
-      <textarea
-        value={text}
-        onChange={e => setText(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            handleSend()
-          }
-        }}
-        rows={1}
-        placeholder="manda a sua..."
-        className="flex-1 max-h-24 resize-none bg-transparent font-sans text-[14px] leading-5 outline-none placeholder:text-ink-4 py-1"
-      />
-      <button
-        onClick={handleSend}
-        disabled={!text.trim()}
-        className="btn-yellow px-3 py-1.5 text-[11px] disabled:opacity-40 flex-shrink-0"
-      >
-        ENVIAR
-      </button>
+    <div className="border-t border-hairline bg-paper flex-shrink-0">
+      <div className="flex items-end gap-2 px-3 py-2.5">
+        <button
+          onClick={onGifToggle}
+          className={cn(
+            'flex-shrink-0 font-mono text-[10px] font-bold px-2.5 py-2 border transition-colors mb-0.5',
+            gifActive ? 'bg-ink text-paper border-ink' : 'border-hairline text-ink-3 hover:border-ink hover:text-ink',
+          )}
+          title="Enviar GIF"
+        >
+          GIF
+        </button>
+        <div className="flex-1 relative">
+          <textarea
+            value={text}
+            onChange={e => handleChange(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+            }}
+            rows={1}
+            placeholder="manda a sua..."
+            className="w-full max-h-28 resize-none bg-transparent font-sans text-[14px] leading-5 outline-none placeholder:text-ink-4 py-1.5"
+            style={{ overflowY: text.includes('\n') || text.length > 80 ? 'auto' : 'hidden' }}
+          />
+          {text.length > MAX_CHARS * 0.8 && (
+            <span className={cn(
+              'absolute bottom-0.5 right-1 font-mono text-[9px]',
+              text.length > MAX_CHARS * 0.95 ? 'text-red' : 'text-ink-4',
+            )}>
+              {MAX_CHARS - text.length}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={handleSend}
+          disabled={!text.trim()}
+          className="btn-yellow px-3 py-2 text-[11px] disabled:opacity-30 flex-shrink-0 mb-0.5 tracking-eyebrow font-bold"
+        >
+          ENVIAR
+        </button>
+      </div>
     </div>
   )
 }
 
-// ─── Screen ─────────────────────────────────────────────────────────────────────
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function ResenhaScreen() {
-  const { messages, pinnedId, lastError, addMessage, clearError, setPinned, voteOnPoll, deleteMessage } = useChatStore()
-  const [gifOpen, setGifOpen] = useState(false)
-  const [pollOpen, setPollOpen] = useState(false)
+  const { messages, pinnedId, isLoaded, lastError, addMessage, clearError, setPinned, voteOnPoll, deleteMessage } =
+    useChatStore()
+  const { user }   = useAuthStore()
+  const isAdmin    = user?.isAdmin ?? false
+  const isDesktop  = useIsDesktop()
+
+  const [gifOpen,   setGifOpen]   = useState(false)
+  const [pollOpen,  setPollOpen]  = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const { user } = useAuthStore()
-  const isAdmin = user?.isAdmin ?? false
-  const isDesktop = useIsDesktop()
+  const [atBottom,  setAtBottom]  = useState(true)
 
-  // derive per-user voted options from stored poll data
-  const userVotes: Record<string, string> = {}
-  if (user?.id) {
-    messages.forEach(m => {
-      if (m.poll?.votes[user.id]) userVotes[m.id] = m.poll.votes[user.id]
-    })
-  }
+  const scrollRef  = useRef<HTMLDivElement>(null)
+  const bottomRef  = useRef<HTMLDivElement>(null)
 
+  // Auto-scroll only when user is at the bottom
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (atBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, atBottom])
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+    setAtBottom(nearBottom)
+  }, [])
 
   const me = user
 
   const buildMsg = useCallback(
     (overrides: Partial<ChatMessage>): ChatMessage => ({
-      id: crypto.randomUUID(),
-      userId: me?.id ?? 'me',
+      id:        crypto.randomUUID(),
+      userId:    me?.id ?? 'me',
       channelId: 'geral',
-      who: me ? `${me.firstName} ${me.lastName}` : 'Você',
-      dept: me?.dept ?? '',
-      initials: me?.initials ?? 'EU',
-      color: me?.color ?? '#00A651',
+      who:       me ? `${me.firstName} ${me.lastName}` : 'Você',
+      dept:      me?.dept ?? '',
+      initials:  me?.initials ?? 'EU',
+      color:     me?.color ?? '#00A651',
       avatarUrl: me?.avatarUrl,
-      time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      text: '',
-      type: 'text',
-      isYou: true,
+      time:      new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      text:      '',
+      type:      'text',
+      isYou:     true,
       createdAt: new Date().toISOString(),
       ...overrides,
     }),
-    [me]
+    [me],
   )
 
-  const sendText = useCallback((text: string) => {
-    addMessage(buildMsg({ text, type: 'text' }))
-  }, [addMessage, buildMsg])
+  const sendText = useCallback((text: string) => addMessage(buildMsg({ text, type: 'text' })), [addMessage, buildMsg])
+  const sendGif  = useCallback((gifUrl: string) => { addMessage(buildMsg({ type: 'gif', gifUrl })); setGifOpen(false) }, [addMessage, buildMsg])
+  const sendPoll = useCallback((poll: ChatPoll) => { setPollOpen(false); addMessage(buildMsg({ text: poll.question, type: 'poll', poll, isYou: false })) }, [addMessage, buildMsg])
 
-  const sendGif = useCallback((gifUrl: string) => {
-    setGifOpen(false)
-    addMessage(buildMsg({ type: 'gif', gifUrl }))
-  }, [addMessage, buildMsg])
+  const togglePin = useCallback((id: string) => void setPinned(pinnedId === id ? null : id), [setPinned, pinnedId])
+  const vote      = useCallback((msgId: string, optId: string) => void voteOnPoll(msgId, me?.id ?? 'me', optId), [me, voteOnPoll])
 
-  const sendPoll = useCallback((poll: ChatPoll) => {
-    setPollOpen(false)
-    addMessage(buildMsg({ text: poll.question, type: 'poll', poll, isYou: false }))
-  }, [addMessage, buildMsg])
-
-  const togglePin = useCallback((id: string) => {
-    void setPinned(pinnedId === id ? null : id)
-  }, [setPinned, pinnedId])
-
-  const vote = useCallback((pollMsgId: string, optionId: string) => {
-    const userId = me?.id ?? 'me'
-    void voteOnPoll(pollMsgId, userId, optionId)
-  }, [me, voteOnPoll])
-
-  const pinnedMsg = pinnedId ? messages.find(m => m.id === pinnedId) : null
-
+  const pinnedMsg     = pinnedId ? messages.find(m => m.id === pinnedId) : null
   const pinnedPreview = pinnedMsg
-    ? pinnedMsg.type === 'gif'
-      ? 'GIF'
-      : pinnedMsg.type === 'poll'
-        ? pinnedMsg.poll?.question
-        : pinnedMsg.text
+    ? pinnedMsg.type === 'gif' ? '🖼 GIF'
+    : pinnedMsg.type === 'poll' ? `📊 ${pinnedMsg.poll?.question ?? ''}`
+    : pinnedMsg.text
     : null
+
+  // Enrich messages with grouping + date separators
+  const enriched = useMemo(() => {
+    type EnrichedItem =
+      | { kind: 'date'; label: string; key: string }
+      | { kind: 'msg'; msg: ChatMessage; grouped: boolean }
+
+    const items: EnrichedItem[] = []
+    let lastDay  = ''
+    let lastUser = ''
+
+    for (const m of messages) {
+      const day = new Date(m.createdAt).toDateString()
+      if (day !== lastDay) {
+        items.push({ kind: 'date', label: dayLabel(m.createdAt), key: `sep-${m.createdAt}` })
+        lastDay  = day
+        lastUser = ''
+      }
+      const grouped = m.userId === lastUser && m.type !== 'poll'
+      items.push({ kind: 'msg', msg: m, grouped })
+      lastUser = m.userId
+    }
+    return items
+  }, [messages])
 
   return (
     <div
@@ -573,9 +517,8 @@ export function ResenhaScreen() {
           : 'calc(100dvh - 5.5rem - env(safe-area-inset-bottom, 0px))',
       }}
     >
-
-      {/* ── Header ── */}
-      <div className="bg-paper border-b border-line px-4 py-3 flex items-center justify-between flex-shrink-0">
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="border-b border-hairline px-4 py-3 flex items-center justify-between flex-shrink-0 bg-paper">
         <div className="flex items-center gap-3">
           <span className="font-display text-2xl">#RESENHA</span>
           <div className="flex items-center gap-1.5">
@@ -583,10 +526,10 @@ export function ResenhaScreen() {
             <span className="font-mono text-[10px] text-ink-3">AO VIVO</span>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-[10px] text-ink-4 hidden md:block">
-            {messages.length} MSGS
-          </span>
+        <div className="flex items-center gap-2">
+          {messages.length > 0 && (
+            <span className="font-mono text-[10px] text-ink-4">{messages.length} msgs</span>
+          )}
           {isAdmin && (
             <button
               onClick={() => setPollOpen(true)}
@@ -598,28 +541,23 @@ export function ResenhaScreen() {
         </div>
       </div>
 
-      {/* ── Pinned bar ── */}
+      {/* ── Pinned ─────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {pinnedMsg && (
           <motion.div
             key="pinned"
-            initial={{ height: 0 }}
-            animate={{ height: 'auto' }}
-            exit={{ height: 0 }}
+            initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
             transition={{ duration: 0.18 }}
             className="overflow-hidden flex-shrink-0"
           >
-            <div className="border-b border-yellow/50 bg-yellow/10 px-4 py-2 flex items-center gap-2">
-              <span className="text-xs flex-shrink-0 font-mono font-bold">·</span>
+            <div className="border-b border-yellow/40 bg-yellow/8 px-4 py-2 flex items-center gap-2">
+              <span className="font-mono text-[8px] text-ink-4 flex-shrink-0">📌</span>
               <p className="flex-1 font-sans text-[12px] text-ink-2 truncate min-w-0">
-                <span className="font-semibold text-ink">{pinnedMsg.who}: </span>
+                <span className="font-bold text-ink">{pinnedMsg.who}: </span>
                 {pinnedPreview}
               </p>
               {isAdmin && (
-                <button
-                  onClick={() => setPinned(null)}
-                  className="font-mono text-[9px] text-ink-4 hover:text-ink flex-shrink-0 ml-2"
-                >
+                <button onClick={() => setPinned(null)} className="font-mono text-[9px] text-ink-4 hover:text-ink flex-shrink-0 ml-2">
                   DESAFIXAR
                 </button>
               )}
@@ -628,74 +566,114 @@ export function ResenhaScreen() {
         )}
       </AnimatePresence>
 
-      {/* ── Messages ── */}
-      <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-3 min-h-0">
-        {messages.length === 0 && (
+      {/* ── Messages ───────────────────────────────────────────────────── */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 space-y-1 min-h-0"
+      >
+        {/* Loading skeleton */}
+        {!isLoaded && (
+          <div className="flex flex-col gap-3 py-4">
+            {[70, 50, 85, 60].map(w => (
+              <div key={w} className="flex gap-2 items-end">
+                <div className="w-7 h-7 rounded-full bg-hairline flex-shrink-0" />
+                <div className="h-9 rounded-[4px_14px_14px_14px] bg-hairline" style={{ width: `${w}%` }} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {isLoaded && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-16">
             <span className="font-display text-6xl text-ink-4">○</span>
             <div>
-              <div className="font-display text-2xl text-ink leading-tight">NINGUÉM<br/>FALOU NADA.</div>
-              <p className="font-mono text-[11px] text-ink-3 mt-2 max-w-[220px] mx-auto leading-relaxed">
-                A resenha começa com você. Manda a primeira mensagem.
+              <div className="font-display text-2xl text-ink">NINGUÉM<br/>FALOU NADA.</div>
+              <p className="font-mono text-[11px] text-ink-3 mt-2 max-w-[200px] mx-auto leading-relaxed">
+                A resenha começa com você.
               </p>
             </div>
           </div>
         )}
-        {messages.map(m => (
-          <div
-            key={m.id}
-            className="relative group"
-            onMouseEnter={() => setHoveredId(m.id)}
-            onMouseLeave={() => setHoveredId(null)}
-            onContextMenu={isAdmin ? (e) => { e.preventDefault(); setHoveredId(m.id) } : undefined}
-          >
-            <MessageRow m={m} userVotes={userVotes} onVote={(optId) => vote(m.id, optId)} />
 
-            {/* Admin action buttons (on hover) */}
-            {isAdmin && hoveredId === m.id && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.92 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="absolute -top-1 right-0 flex gap-1 z-10"
-              >
-                {m.type !== 'poll' && (
-                  <button
-                    onClick={() => togglePin(m.id)}
-                    className={cn(
-                      'font-mono text-[9px] px-2 py-1 border',
-                      pinnedId === m.id
-                        ? 'bg-yellow border-ink text-ink'
-                        : 'bg-paper border-line text-ink-3 hover:border-ink hover:text-ink'
-                    )}
-                  >
-                    {pinnedId === m.id ? 'DESAFIXAR' : 'FIXAR'}
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    if (window.confirm('Apagar esta mensagem?')) deleteMessage(m.id)
-                  }}
-                  className="font-mono text-[9px] px-2 py-1 border bg-paper border-line text-red/70 hover:border-red hover:text-red"
+        {/* Message list */}
+        {enriched.map(item => {
+          if (item.kind === 'date') return <DateSeparator key={item.key} label={item.label} />
+          const { msg: m, grouped } = item
+          return (
+            <div
+              key={m.id}
+              className={cn('relative group', grouped ? 'mt-0.5' : 'mt-3')}
+              onMouseEnter={() => setHoveredId(m.id)}
+              onMouseLeave={() => setHoveredId(null)}
+            >
+              {m.type === 'poll' && m.poll
+                ? <PollBubble m={m} userId={me?.id} onVote={optId => vote(m.id, optId)} />
+                : m.type === 'gif' && m.gifUrl
+                  ? <GifBubble m={m} grouped={grouped} />
+                  : <TextBubble m={m} grouped={grouped} />
+              }
+
+              {/* Action buttons (admin: all messages; user: own messages) */}
+              {(isAdmin || m.isYou) && hoveredId === m.id && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className={cn('absolute -top-2 flex gap-1 z-10', m.isYou ? 'left-0' : 'right-0')}
                 >
-                  ✕ APAGAR
-                </button>
-              </motion.div>
-            )}
-          </div>
-        ))}
+                  {isAdmin && m.type !== 'poll' && (
+                    <button
+                      onClick={() => togglePin(m.id)}
+                      className={cn(
+                        'font-mono text-[9px] px-2 py-1 border',
+                        pinnedId === m.id
+                          ? 'bg-yellow border-ink text-ink'
+                          : 'bg-paper border-hairline text-ink-3 hover:border-ink hover:text-ink',
+                      )}
+                    >
+                      {pinnedId === m.id ? 'DESAFIXAR' : 'FIXAR'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { if (window.confirm('Apagar esta mensagem?')) void deleteMessage(m.id) }}
+                    className="font-mono text-[9px] px-2 py-1 border bg-paper border-hairline text-red/60 hover:border-red hover:text-red"
+                  >
+                    APAGAR
+                  </button>
+                </motion.div>
+              )}
+            </div>
+          )
+        })}
         <div ref={bottomRef} />
       </div>
 
-      {/* ── Error banner ── */}
+      {/* ── Scroll to bottom button ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {!atBottom && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
+            className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20"
+          >
+            <button
+              onClick={() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); setAtBottom(true) }}
+              className="bg-ink text-paper font-mono text-[10px] px-3 py-1.5 border border-ink shadow-card"
+            >
+              ↓ VER NOVAS MSGS
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Error banner ───────────────────────────────────────────────── */}
       <AnimatePresence>
         {lastError && (
           <motion.div
-            initial={{ height: 0 }}
-            animate={{ height: 'auto' }}
-            exit={{ height: 0 }}
+            initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
             className="overflow-hidden flex-shrink-0"
           >
-            <div className="flex items-center justify-between px-4 py-2 bg-red/10 border-t border-red/30">
+            <div className="flex items-center justify-between px-4 py-2 bg-red/8 border-t border-red/20">
               <span className="font-mono text-[10px] text-red">{lastError}</span>
               <button onClick={clearError} className="font-mono text-[10px] text-red/60 hover:text-red ml-3">✕</button>
             </div>
@@ -703,19 +681,15 @@ export function ResenhaScreen() {
         )}
       </AnimatePresence>
 
-      {/* ── GIF Picker (slide up) ── */}
+      {/* ── GIF Picker ─────────────────────────────────────────────────── */}
       <AnimatePresence>
         {gifOpen && <GifPicker onSelect={sendGif} onClose={() => setGifOpen(false)} />}
       </AnimatePresence>
 
-      {/* ── Input ── */}
-      <ChatInput
-        onSend={sendText}
-        onGifToggle={() => setGifOpen(v => !v)}
-        gifActive={gifOpen}
-      />
+      {/* ── Input ──────────────────────────────────────────────────────── */}
+      <ChatInput onSend={sendText} onGifToggle={() => setGifOpen(v => !v)} gifActive={gifOpen} />
 
-      {/* ── Poll Modal (admin only) ── */}
+      {/* ── Poll Modal ─────────────────────────────────────────────────── */}
       <AnimatePresence>
         {pollOpen && <PollModal onCreate={sendPoll} onClose={() => setPollOpen(false)} />}
       </AnimatePresence>

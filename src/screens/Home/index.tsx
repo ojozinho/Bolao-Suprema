@@ -985,30 +985,51 @@ function HomeDesktop() {
   )
 }
 
+function msgPreview(msg: { type?: string; text?: string; gifUrl?: string; poll?: { question?: string } }): string {
+  if (msg.type === 'gif')  return '🖼 enviou um GIF'
+  if (msg.type === 'poll') return `📊 ${msg.poll?.question ?? 'enquete'}`
+  return msg.text ?? ''
+}
+
 function ResenhaCard() {
   const navigate = useNavigate()
   const messages = useChatStore(s => s.messages)
-  const recent = messages.slice(-3)
+  const isLoaded = useChatStore(s => s.isLoaded)
+  const recent   = messages.slice(-4)
 
   return (
     <div className="border-2 border-ink flex flex-col overflow-hidden">
       <div className="px-4 py-3 border-b border-hairline flex items-baseline justify-between">
         <div className="flex items-baseline gap-1.5">
           <span className="font-display text-lg">#RESENHA</span>
-          <span className="font-serif-it text-sm text-ink-3">ao vivo</span>
+          <div className="flex items-center gap-1 ml-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-green animate-pulse-live" />
+            <span className="font-mono text-[9px] text-ink-4">ao vivo</span>
+          </div>
         </div>
         <button onClick={() => navigate('/resenha')} className="font-mono text-[10px] text-ink-4 hover:text-ink">
           ENTRAR →
         </button>
       </div>
-      {recent.length === 0 ? (
+
+      {!isLoaded ? (
+        /* Loading skeleton */
+        <div className="flex flex-col divide-y divide-hairline">
+          {[60, 80, 50].map(w => (
+            <div key={w} className="px-4 py-3 flex gap-2.5 items-center">
+              <div className="w-6 h-6 rounded-full bg-hairline flex-shrink-0" />
+              <div className="h-3 rounded bg-hairline" style={{ width: `${w}%` }} />
+            </div>
+          ))}
+        </div>
+      ) : recent.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-3">
-          <span className="font-display text-4xl text-ink-4">○</span>
+          <span className="font-display text-3xl text-ink-4">○</span>
           <p className="font-mono text-[11px] text-ink-3 leading-relaxed">
-            Nenhuma mensagem ainda. Seja o primeiro a entrar na resenha.
+            Nenhuma mensagem ainda.
           </p>
-          <button onClick={() => navigate('/resenha')} className="btn-ghost text-[10px]">
-            ENTRAR NA RESENHA →
+          <button onClick={() => navigate('/resenha')} className="font-mono text-[10px] text-ink-3 hover:text-ink underline">
+            Seja o primeiro →
           </button>
         </div>
       ) : (
@@ -1017,8 +1038,10 @@ function ResenhaCard() {
             <div key={msg.id} className="px-4 py-2.5 flex gap-2.5 items-start">
               <Avatar initials={msg.initials} color={msg.color} src={msg.avatarUrl} size={24} />
               <div className="flex-1 min-w-0">
-                <span className="font-mono text-[10px] font-bold text-ink">{msg.who}</span>
-                <p className="font-sans text-[12px] text-ink-2 leading-snug truncate">{msg.text}</p>
+                <span className="font-mono text-[10px] font-bold text-ink leading-none">{msg.who}</span>
+                <p className="font-sans text-[12px] text-ink-2 leading-snug truncate mt-0.5">
+                  {msgPreview(msg)}
+                </p>
               </div>
             </div>
           ))}
