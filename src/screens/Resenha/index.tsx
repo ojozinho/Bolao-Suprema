@@ -268,22 +268,22 @@ function useAudioRecorder() {
 
 // ─── Message bubble parts ─────────────────────────────────────────────────────
 
-function UserAvatar({ m, onClick }: { m: ChatMessage; onClick?: () => void }) {
+function UserAvatar({ m, onOpen }: { m: ChatMessage; onOpen?: () => void }) {
   return (
     <button
-      onClick={onClick}
-      disabled={!onClick}
-      className={cn('flex-shrink-0 mt-0.5', onClick && 'hover:opacity-75 transition-opacity cursor-pointer')}
+      onClick={onOpen}
+      disabled={!onOpen}
+      className={cn('flex-shrink-0', onOpen && 'hover:opacity-80 transition-opacity cursor-pointer')}
     >
-      <Avatar initials={m.initials} color={m.color} src={m.avatarUrl} size={30} />
+      <Avatar initials={m.initials} color={m.color} src={m.avatarUrl} size={32} />
     </button>
   )
 }
 
-function MsgHeader({ m, navigate }: { m: ChatMessage; navigate: (path: string) => void }) {
+function MsgHeader({ m, onOpen }: { m: ChatMessage; onOpen: () => void }) {
   return (
     <button
-      onClick={() => navigate(`/u/${m.userId}`)}
+      onClick={onOpen}
       className="font-mono text-[10px] text-ink-3 hover:text-ink transition-colors text-left leading-none mb-1.5"
     >
       <span className="font-bold text-ink">{m.who}</span>
@@ -293,17 +293,54 @@ function MsgHeader({ m, navigate }: { m: ChatMessage; navigate: (path: string) =
   )
 }
 
-function TextBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
+// ─── Chat Profile Panel (WhatsApp-style side panel) ──────────────────────────
+
+function ChatProfilePanel({ m, onClose }: { m: ChatMessage; onClose: () => void }) {
   const navigate = useNavigate()
   return (
-    <div className={cn('flex gap-2.5', m.isYou ? 'flex-row-reverse' : '')}>
+    <motion.div
+      initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+      transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+      className="absolute inset-y-0 right-0 w-72 bg-paper border-l border-hairline z-40 flex flex-col shadow-2xl"
+    >
+      <div className="flex items-center justify-between px-4 py-3 border-b border-hairline flex-shrink-0">
+        <button onClick={onClose} className="font-mono text-[10px] tracking-eyebrow text-ink-3 hover:text-ink transition-colors">
+          ← FECHAR
+        </button>
+        <span className="font-mono text-[9px] tracking-eyebrow text-ink-4">PARTICIPANTE</span>
+      </div>
+      <div className="flex flex-col items-center pt-10 pb-6 px-6 gap-4">
+        <div className="w-20 h-20 rounded-full overflow-hidden flex-shrink-0 border-2 border-hairline" style={{ background: m.color }}>
+          {m.avatarUrl
+            ? <img src={m.avatarUrl} alt="" className="w-full h-full object-cover" />
+            : <Avatar initials={m.initials} color={m.color} size={80} />
+          }
+        </div>
+        <div className="text-center">
+          <div className="font-display text-xl text-ink leading-none">{m.who}</div>
+          {m.dept && <div className="font-sans text-[13px] text-ink-3 mt-1.5">{m.dept}</div>}
+        </div>
+        <button
+          onClick={() => { onClose(); navigate(`/u/${m.userId}`) }}
+          className="btn-yellow w-full justify-center mt-2"
+        >
+          VER PERFIL COMPLETO →
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
+function TextBubble({ m, grouped, onOpenProfile }: { m: ChatMessage; grouped: boolean; onOpenProfile: (m: ChatMessage) => void }) {
+  return (
+    <div className={cn('flex gap-2.5 items-start', m.isYou ? 'flex-row-reverse' : '')}>
       {!m.isYou && (
         grouped
-          ? <div className="w-[30px] flex-shrink-0" />
-          : <UserAvatar m={m} onClick={() => navigate(`/u/${m.userId}`)} />
+          ? <div className="w-[32px] flex-shrink-0" />
+          : <UserAvatar m={m} onOpen={() => onOpenProfile(m)} />
       )}
       <div className={cn('max-w-[78%] md:max-w-[65%] flex flex-col gap-0.5', m.isYou ? 'items-end' : 'items-start')}>
-        {!m.isYou && !grouped && <MsgHeader m={m} navigate={navigate} />}
+        {!m.isYou && !grouped && <MsgHeader m={m} onOpen={() => onOpenProfile(m)} />}
         <div className={cn(
           'px-3.5 py-2.5 text-[13px] leading-[1.45] break-words whitespace-pre-wrap shadow-sm',
           m.isYou
@@ -314,45 +351,43 @@ function TextBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
         </div>
         {m.isYou && <span className="font-mono text-[9px] text-ink-4 mt-0.5">{m.time}</span>}
       </div>
-      {m.isYou && <div className="w-[30px] flex-shrink-0" />}
+      {m.isYou && <div className="w-[32px] flex-shrink-0" />}
     </div>
   )
 }
 
-function GifBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
-  const navigate = useNavigate()
+function GifBubble({ m, grouped, onOpenProfile }: { m: ChatMessage; grouped: boolean; onOpenProfile: (m: ChatMessage) => void }) {
   return (
-    <div className={cn('flex gap-2.5', m.isYou ? 'flex-row-reverse' : '')}>
+    <div className={cn('flex gap-2.5 items-start', m.isYou ? 'flex-row-reverse' : '')}>
       {!m.isYou && (
         grouped
-          ? <div className="w-[30px] flex-shrink-0" />
-          : <UserAvatar m={m} onClick={() => navigate(`/u/${m.userId}`)} />
+          ? <div className="w-[32px] flex-shrink-0" />
+          : <UserAvatar m={m} onOpen={() => onOpenProfile(m)} />
       )}
       <div className={cn('max-w-[60%] flex flex-col gap-0.5', m.isYou ? 'items-end' : 'items-start')}>
-        {!m.isYou && !grouped && <MsgHeader m={m} navigate={navigate} />}
+        {!m.isYou && !grouped && <MsgHeader m={m} onOpen={() => onOpenProfile(m)} />}
         <div className={cn('overflow-hidden shadow-sm', m.isYou ? 'rounded-[16px_4px_16px_16px]' : 'rounded-[4px_16px_16px_16px]')}>
           <img src={m.gifUrl} alt="GIF" className="max-w-full max-h-52 object-contain block" loading="lazy" />
         </div>
         {m.isYou && <span className="font-mono text-[9px] text-ink-4 mt-0.5">{m.time}</span>}
       </div>
-      {m.isYou && <div className="w-[30px] flex-shrink-0" />}
+      {m.isYou && <div className="w-[32px] flex-shrink-0" />}
     </div>
   )
 }
 
-function ImageBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
-  const navigate = useNavigate()
+function ImageBubble({ m, grouped, onOpenProfile }: { m: ChatMessage; grouped: boolean; onOpenProfile: (m: ChatMessage) => void }) {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <div className={cn('flex gap-2.5', m.isYou ? 'flex-row-reverse' : '')}>
+      <div className={cn('flex gap-2.5 items-start', m.isYou ? 'flex-row-reverse' : '')}>
         {!m.isYou && (
           grouped
-            ? <div className="w-[30px] flex-shrink-0" />
-            : <UserAvatar m={m} onClick={() => navigate(`/u/${m.userId}`)} />
+            ? <div className="w-[32px] flex-shrink-0" />
+            : <UserAvatar m={m} onOpen={() => onOpenProfile(m)} />
         )}
         <div className={cn('max-w-[65%] flex flex-col gap-0.5', m.isYou ? 'items-end' : 'items-start')}>
-          {!m.isYou && !grouped && <MsgHeader m={m} navigate={navigate} />}
+          {!m.isYou && !grouped && <MsgHeader m={m} onOpen={() => onOpenProfile(m)} />}
           <button
             onClick={() => setOpen(true)}
             className={cn('overflow-hidden shadow-sm hover:opacity-90 transition-opacity', m.isYou ? 'rounded-[16px_4px_16px_16px]' : 'rounded-[4px_16px_16px_16px]')}
@@ -361,7 +396,7 @@ function ImageBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
           </button>
           {m.isYou && <span className="font-mono text-[9px] text-ink-4 mt-0.5">{m.time}</span>}
         </div>
-        {m.isYou && <div className="w-[30px] flex-shrink-0" />}
+        {m.isYou && <div className="w-[32px] flex-shrink-0" />}
       </div>
       <AnimatePresence>
         {open && (
@@ -382,8 +417,7 @@ function fmtDur(s: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-function AudioBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
-  const navigate = useNavigate()
+function AudioBubble({ m, grouped, onOpenProfile }: { m: ChatMessage; grouped: boolean; onOpenProfile: (m: ChatMessage) => void }) {
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
   const [duration, setDuration] = useState(m.audioDuration ?? 0)
@@ -396,14 +430,14 @@ function AudioBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
   }
 
   return (
-    <div className={cn('flex gap-2.5', m.isYou ? 'flex-row-reverse' : '')}>
+    <div className={cn('flex gap-2.5 items-start', m.isYou ? 'flex-row-reverse' : '')}>
       {!m.isYou && (
         grouped
-          ? <div className="w-[30px] flex-shrink-0" />
-          : <UserAvatar m={m} onClick={() => navigate(`/u/${m.userId}`)} />
+          ? <div className="w-[32px] flex-shrink-0" />
+          : <UserAvatar m={m} onOpen={() => onOpenProfile(m)} />
       )}
       <div className={cn('flex flex-col gap-0.5', m.isYou ? 'items-end' : 'items-start')}>
-        {!m.isYou && !grouped && <MsgHeader m={m} navigate={navigate} />}
+        {!m.isYou && !grouped && <MsgHeader m={m} onOpen={() => onOpenProfile(m)} />}
         <div className={cn(
           'flex items-center gap-3 px-3.5 py-2.5 shadow-sm min-w-[180px]',
           m.isYou ? 'bg-yellow text-ink rounded-[16px_4px_16px_16px]' : 'bg-paper-deep text-ink rounded-[4px_16px_16px_16px]',
@@ -443,23 +477,22 @@ function AudioBubble({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
         </div>
         {m.isYou && <span className="font-mono text-[9px] text-ink-4 mt-0.5">{m.time}</span>}
       </div>
-      {m.isYou && <div className="w-[30px] flex-shrink-0" />}
+      {m.isYou && <div className="w-[32px] flex-shrink-0" />}
     </div>
   )
 }
 
-function PollBubble({ m, userId, onVote }: { m: ChatMessage; userId?: string; onVote: (optId: string) => void }) {
-  const navigate = useNavigate()
+function PollBubble({ m, userId, onVote, onOpenProfile }: { m: ChatMessage; userId?: string; onVote: (optId: string) => void; onOpenProfile: (m: ChatMessage) => void }) {
   const poll      = m.poll!
   const myVote    = userId ? poll.votes[userId] : null
   const hasVoted  = !!myVote
   const total     = Object.keys(poll.votes).length
 
   return (
-    <div className="flex gap-2.5">
-      <UserAvatar m={m} onClick={() => navigate(`/u/${m.userId}`)} />
+    <div className="flex gap-2.5 items-start">
+      <UserAvatar m={m} onOpen={() => onOpenProfile(m)} />
       <div className="flex-1 max-w-sm">
-        <MsgHeader m={m} navigate={navigate} />
+        <MsgHeader m={m} onOpen={() => onOpenProfile(m)} />
         <div className="border-2 border-ink bg-paper p-4">
           <p className="font-display text-[14px] leading-tight mb-4">{poll.question}</p>
           <div className="space-y-2">
@@ -700,6 +733,7 @@ export function ResenhaScreen() {
   const [atBottom,       setAtBottom]       = useState(true)
   const [mediaErr,       setMediaErr]       = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [profileMsg,     setProfileMsg]     = useState<ChatMessage | null>(null)
 
   const scrollRef        = useRef<HTMLDivElement>(null)
   const bottomRef        = useRef<HTMLDivElement>(null)
@@ -811,13 +845,17 @@ export function ResenhaScreen() {
 
   return (
     <div
-      className="flex flex-col bg-paper overflow-hidden"
+      className="relative flex flex-col bg-paper overflow-hidden"
       style={{
         height: isDesktop
           ? 'calc(100dvh - 5.75rem)'
           : 'calc(100dvh - 5.5rem - env(safe-area-inset-bottom, 0px))',
       }}
     >
+      {/* ── Profile Side Panel ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {profileMsg && <ChatProfilePanel m={profileMsg} onClose={() => setProfileMsg(null)} />}
+      </AnimatePresence>
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="border-b border-hairline px-4 py-3 flex items-center justify-between flex-shrink-0 bg-paper">
         <div className="flex items-center gap-3">
@@ -917,14 +955,14 @@ export function ResenhaScreen() {
               onMouseLeave={() => setHoveredId(null)}
             >
               {m.type === 'poll' && m.poll
-                ? <PollBubble m={m} userId={me?.id} onVote={optId => vote(m.id, optId)} />
+                ? <PollBubble m={m} userId={me?.id} onVote={optId => vote(m.id, optId)} onOpenProfile={setProfileMsg} />
                 : m.type === 'gif' && m.gifUrl
-                  ? <GifBubble m={m} grouped={grouped} />
+                  ? <GifBubble m={m} grouped={grouped} onOpenProfile={setProfileMsg} />
                   : m.type === 'image' && m.imageUrl
-                    ? <ImageBubble m={m} grouped={grouped} />
+                    ? <ImageBubble m={m} grouped={grouped} onOpenProfile={setProfileMsg} />
                     : m.type === 'audio' && m.audioUrl
-                      ? <AudioBubble m={m} grouped={grouped} />
-                      : <TextBubble m={m} grouped={grouped} />
+                      ? <AudioBubble m={m} grouped={grouped} onOpenProfile={setProfileMsg} />
+                      : <TextBubble m={m} grouped={grouped} onOpenProfile={setProfileMsg} />
               }
 
               {(isAdmin || m.isYou) && hoveredId === m.id && (
