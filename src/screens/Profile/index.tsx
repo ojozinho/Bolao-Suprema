@@ -293,6 +293,23 @@ function ProfileMobile() {
   return (
     <div className="min-h-dvh bg-paper pb-28">
 
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-hairline">
+        <button
+          onClick={() => navigate(-1)}
+          className="font-mono text-[10px] tracking-eyebrow text-ink-3 hover:text-ink transition-colors"
+        >
+          ← VOLTAR
+        </button>
+        <span className="font-mono text-[10px] tracking-eyebrow text-ink-4">MEU PERFIL</span>
+        <button
+          onClick={f.handleSignOut}
+          className="font-mono text-[10px] tracking-eyebrow text-red/70 hover:text-red transition-colors"
+        >
+          DESCONECTAR
+        </button>
+      </div>
+
       {/* Banner + avatar header — avatar is OUTSIDE overflow-hidden */}
       <div className="relative">
         {/* Banner */}
@@ -413,8 +430,8 @@ function ProfileMobile() {
             LIMPAR PALPITES
           </button>
           <button onClick={f.handleSignOut}
-            className="py-3 font-mono text-[10px] tracking-eyebrow text-ink-4 hover:text-red transition-colors border-2 border-hairline hover:border-red">
-            SAIR DA CONTA
+            className="py-3 font-mono text-[10px] tracking-eyebrow text-red/60 hover:text-red transition-colors border-2 border-red/30 hover:border-red">
+            DESCONECTAR
           </button>
         </div>
       </div>
@@ -433,11 +450,22 @@ function ProfileDesktop() {
       <div className="max-w-screen-lg mx-auto px-8 py-10">
 
         <div className="flex items-center justify-between mb-8">
-          <Logo height={56} />
           <div className="flex items-center gap-4">
-            <span className="font-mono text-[11px] tracking-eyebrow text-ink-3">MEU PERFIL</span>
-            <button onClick={f.handleSignOut} className="font-mono text-[10px] tracking-eyebrow text-ink-4 hover:text-red transition-colors">SAIR →</button>
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1.5 font-mono text-[10px] tracking-eyebrow text-ink-3 hover:text-ink transition-colors"
+            >
+              ← VOLTAR
+            </button>
+            <span className="text-hairline select-none">|</span>
+            <Logo height={40} />
           </div>
+          <button
+            onClick={f.handleSignOut}
+            className="font-mono text-[10px] tracking-eyebrow text-red/70 hover:text-red transition-colors border border-red/30 hover:border-red px-3 py-1.5 rounded"
+          >
+            DESCONECTAR
+          </button>
         </div>
 
         <div className="grid grid-cols-[1fr_300px] gap-10">
@@ -562,8 +590,8 @@ function ProfileDesktop() {
                   LIMPAR PALPITES
                 </button>
                 <button onClick={f.handleSignOut}
-                  className="px-4 py-3 font-mono text-[10px] tracking-eyebrow text-ink-4 hover:text-red transition-colors border-2 border-hairline hover:border-red">
-                  SAIR
+                  className="px-4 py-3 font-mono text-[10px] tracking-eyebrow text-red/60 hover:text-red transition-colors border-2 border-red/30 hover:border-red">
+                  DESCONECTAR
                 </button>
               </div>
             </div>
