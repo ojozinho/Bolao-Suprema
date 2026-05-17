@@ -694,11 +694,12 @@ export function ResenhaScreen() {
   const isAdmin    = user?.isAdmin ?? false
   const isDesktop  = useIsDesktop()
 
-  const [gifOpen,   setGifOpen]   = useState(false)
-  const [pollOpen,  setPollOpen]  = useState(false)
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [atBottom,  setAtBottom]  = useState(true)
-  const [mediaErr,  setMediaErr]  = useState<string | null>(null)
+  const [gifOpen,        setGifOpen]        = useState(false)
+  const [pollOpen,       setPollOpen]       = useState(false)
+  const [hoveredId,      setHoveredId]      = useState<string | null>(null)
+  const [atBottom,       setAtBottom]       = useState(true)
+  const [mediaErr,       setMediaErr]       = useState<string | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const scrollRef        = useRef<HTMLDivElement>(null)
   const bottomRef        = useRef<HTMLDivElement>(null)
@@ -946,7 +947,7 @@ export function ResenhaScreen() {
                     </button>
                   )}
                   <button
-                    onClick={() => { if (window.confirm('Apagar esta mensagem?')) void deleteMessage(m.id) }}
+                    onClick={() => setDeleteConfirmId(m.id)}
                     className="font-mono text-[9px] px-2 py-1 border bg-paper border-hairline text-red/60 hover:border-red hover:text-red"
                   >
                     APAGAR
@@ -1011,6 +1012,43 @@ export function ResenhaScreen() {
       {/* ── Poll Modal ─────────────────────────────────────────────────── */}
       <AnimatePresence>
         {pollOpen && <PollModal onCreate={sendPoll} onClose={() => setPollOpen(false)} />}
+      </AnimatePresence>
+
+      {/* ── Delete Confirm ─────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {deleteConfirmId && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 backdrop-blur-sm px-6"
+            onClick={() => setDeleteConfirmId(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 26 }}
+              className="bg-paper rounded-2xl shadow-xl w-full max-w-xs p-6 flex flex-col gap-5"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex flex-col gap-1">
+                <span className="font-display text-lg text-ink leading-none">Apagar mensagem?</span>
+                <span className="font-sans text-sm text-ink-3">Esta ação não pode ser desfeita.</span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setDeleteConfirmId(null)}
+                  className="flex-1 font-mono text-[11px] tracking-widest py-3 border border-hairline text-ink-3 hover:border-ink hover:text-ink transition-colors rounded-lg"
+                >
+                  CANCELAR
+                </button>
+                <button
+                  onClick={() => { void deleteMessage(deleteConfirmId); setDeleteConfirmId(null) }}
+                  className="flex-1 font-mono text-[11px] tracking-widest py-3 bg-red text-white hover:bg-red/80 transition-colors rounded-lg"
+                >
+                  APAGAR
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   )
