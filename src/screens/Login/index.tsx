@@ -33,7 +33,7 @@ function useOtpFlow() {
   const codeComplete = code.length >= 6
 
   const handleSendOtp = async () => {
-    if (!canSendEmail || loading) return
+    if (!canSendEmail || loading || resendCooldown > 0) return
     setLoading(true)
     setError('')
     const res = await sendOtp(email.trim())
@@ -193,10 +193,10 @@ function LoginMobile() {
 
               <button
                 onClick={f.handleSendOtp}
-                disabled={!f.canSendEmail || f.loading}
+                disabled={!f.canSendEmail || f.loading || f.resendCooldown > 0}
                 className="btn-yellow w-full justify-center disabled:opacity-50"
               >
-                {f.loading ? 'ENVIANDO…' : 'RECEBER CÓDIGO →'}
+                {f.loading ? 'ENVIANDO…' : f.resendCooldown > 0 ? `AGUARDE ${f.resendCooldown}S` : 'RECEBER CÓDIGO →'}
               </button>
 
               <label className="flex items-center gap-2 mt-4 cursor-pointer">
@@ -354,10 +354,10 @@ function LoginDesktop() {
 
               <button
                 onClick={f.handleSendOtp}
-                disabled={!f.canSendEmail || f.loading}
+                disabled={!f.canSendEmail || f.loading || f.resendCooldown > 0}
                 className="btn-yellow w-full justify-center disabled:opacity-50"
               >
-                {f.loading ? 'ENVIANDO…' : 'RECEBER CÓDIGO →'}
+                {f.loading ? 'ENVIANDO…' : f.resendCooldown > 0 ? `AGUARDE ${f.resendCooldown}S` : 'RECEBER CÓDIGO →'}
               </button>
 
               <label className="flex items-center gap-2 mt-4 cursor-pointer">
