@@ -584,479 +584,72 @@ function GroupsTab() {
 
 // ─── Knockout tab ─────────────────────────────────────────────────────────────
 
-type KoRound = 'r32' | 'r16' | 'qf' | 'sf' | 'final'
-
-const KO_ROUNDS: { id: KoRound; label: string; short: string; matchCount: number }[] = [
-  { id: 'r32',   label: 'RODADA DE 32',     short: '32',      matchCount: 16 },
-  { id: 'r16',   label: 'OITAVAS DE FINAL', short: 'OITAVAS', matchCount: 8  },
-  { id: 'qf',    label: 'QUARTAS DE FINAL', short: 'QUARTAS', matchCount: 4  },
-  { id: 'sf',    label: 'SEMIFINAIS',       short: 'SEMI',    matchCount: 2  },
-  { id: 'final', label: 'FINAL',            short: 'FINAL',   matchCount: 1  },
-]
-
-interface KoR32Def {
-  slotId: string
-  homeGroup: string
-  homeRank: 1 | 2
-  awayGroup: string
-  awayRank: 1 | 2
-  label: string
+const KO_STAGE_LABELS: Record<string, string> = {
+  round_of_32:   'RODADA DE 32',
+  round_of_16:   'OITAVAS DE FINAL',
+  quarter_final: 'QUARTAS DE FINAL',
+  semi_final:    'SEMIFINAIS',
+  third_place:   '3° LUGAR',
+  final:         'FINAL',
 }
+const KO_STAGE_ORDER = ['round_of_32', 'round_of_16', 'quarter_final', 'semi_final', 'third_place', 'final']
 
-const KO_R32_DEFS: KoR32Def[] = [
-  { slotId: 'ko-r32-1',  homeGroup: 'A', homeRank: 1, awayGroup: 'B', awayRank: 2, label: 'J1'  },
-  { slotId: 'ko-r32-2',  homeGroup: 'C', homeRank: 1, awayGroup: 'D', awayRank: 2, label: 'J2'  },
-  { slotId: 'ko-r32-3',  homeGroup: 'E', homeRank: 1, awayGroup: 'F', awayRank: 2, label: 'J3'  },
-  { slotId: 'ko-r32-4',  homeGroup: 'G', homeRank: 1, awayGroup: 'H', awayRank: 2, label: 'J4'  },
-  { slotId: 'ko-r32-5',  homeGroup: 'I', homeRank: 1, awayGroup: 'J', awayRank: 2, label: 'J5'  },
-  { slotId: 'ko-r32-6',  homeGroup: 'K', homeRank: 1, awayGroup: 'L', awayRank: 2, label: 'J6'  },
-  { slotId: 'ko-r32-7',  homeGroup: 'B', homeRank: 1, awayGroup: 'A', awayRank: 2, label: 'J7'  },
-  { slotId: 'ko-r32-8',  homeGroup: 'D', homeRank: 1, awayGroup: 'C', awayRank: 2, label: 'J8'  },
-  { slotId: 'ko-r32-9',  homeGroup: 'F', homeRank: 1, awayGroup: 'E', awayRank: 2, label: 'J9'  },
-  { slotId: 'ko-r32-10', homeGroup: 'H', homeRank: 1, awayGroup: 'G', awayRank: 2, label: 'J10' },
-  { slotId: 'ko-r32-11', homeGroup: 'J', homeRank: 1, awayGroup: 'I', awayRank: 2, label: 'J11' },
-  { slotId: 'ko-r32-12', homeGroup: 'L', homeRank: 1, awayGroup: 'K', awayRank: 2, label: 'J12' },
-  { slotId: 'ko-r32-13', homeGroup: 'A', homeRank: 2, awayGroup: 'C', awayRank: 2, label: 'J13' },
-  { slotId: 'ko-r32-14', homeGroup: 'B', homeRank: 2, awayGroup: 'D', awayRank: 2, label: 'J14' },
-  { slotId: 'ko-r32-15', homeGroup: 'E', homeRank: 2, awayGroup: 'G', awayRank: 2, label: 'J15' },
-  { slotId: 'ko-r32-16', homeGroup: 'I', homeRank: 2, awayGroup: 'K', awayRank: 2, label: 'J16' },
+const KO_POINTS_GUIDE = [
+  { pts: '+2',  label: 'Classificado acertado (incl. prorrogação/pênaltis)' },
+  { pts: '+5',  label: 'Resultado correto (vitória/derrota no regulamentar)' },
+  { pts: '+8',  label: 'Resultado + gols de um time' },
+  { pts: '+12', label: 'Placar exato (tempo regulamentar)' },
 ]
-
-interface KoNextDef { slotId: string; slot1: string; slot2: string; label: string }
-
-const KO_R16_DEFS: KoNextDef[] = [
-  { slotId: 'ko-r16-1', slot1: 'ko-r32-1',  slot2: 'ko-r32-2',  label: 'J17' },
-  { slotId: 'ko-r16-2', slot1: 'ko-r32-3',  slot2: 'ko-r32-4',  label: 'J18' },
-  { slotId: 'ko-r16-3', slot1: 'ko-r32-5',  slot2: 'ko-r32-6',  label: 'J19' },
-  { slotId: 'ko-r16-4', slot1: 'ko-r32-7',  slot2: 'ko-r32-8',  label: 'J20' },
-  { slotId: 'ko-r16-5', slot1: 'ko-r32-9',  slot2: 'ko-r32-10', label: 'J21' },
-  { slotId: 'ko-r16-6', slot1: 'ko-r32-11', slot2: 'ko-r32-12', label: 'J22' },
-  { slotId: 'ko-r16-7', slot1: 'ko-r32-13', slot2: 'ko-r32-14', label: 'J23' },
-  { slotId: 'ko-r16-8', slot1: 'ko-r32-15', slot2: 'ko-r32-16', label: 'J24' },
-]
-
-const KO_QF_DEFS: KoNextDef[] = [
-  { slotId: 'ko-qf-1', slot1: 'ko-r16-1', slot2: 'ko-r16-2', label: 'J25' },
-  { slotId: 'ko-qf-2', slot1: 'ko-r16-3', slot2: 'ko-r16-4', label: 'J26' },
-  { slotId: 'ko-qf-3', slot1: 'ko-r16-5', slot2: 'ko-r16-6', label: 'J27' },
-  { slotId: 'ko-qf-4', slot1: 'ko-r16-7', slot2: 'ko-r16-8', label: 'J28' },
-]
-
-const KO_SF_DEFS: KoNextDef[] = [
-  { slotId: 'ko-sf-1', slot1: 'ko-qf-1', slot2: 'ko-qf-2', label: 'J29' },
-  { slotId: 'ko-sf-2', slot1: 'ko-qf-3', slot2: 'ko-qf-4', label: 'J30' },
-]
-
-const KO_3RD_DEF   = { slotId: 'ko-3rd-1',   slot1: 'ko-sf-1', slot2: 'ko-sf-2', label: '3° LUGAR' }
-const KO_FINAL_DEF = { slotId: 'ko-final-1', slot1: 'ko-sf-1', slot2: 'ko-sf-2', label: 'FINAL'    }
-
-// ─── Knockout team resolution ─────────────────────────────────────────────────
-
-interface KoTeams { home: string | null; away: string | null }
-
-function resolveKoTeams(
-  groupPredMap: Record<string, { homeScore: number; awayScore: number }>,
-  koPredictions: Record<string, { homeScore: number; awayScore: number }>,
-  allMatches: Match[]
-): Record<string, KoTeams> {
-  const result: Record<string, KoTeams> = {}
-
-  const groupTop2: Record<string, [string | null, string | null]> = {}
-  for (const g of GROUP_LABELS) {
-    groupTop2[g] = computeGroupTop2(g, groupPredMap, allMatches)
-  }
-
-  for (const def of KO_R32_DEFS) {
-    const [h1, h2] = groupTop2[def.homeGroup] ?? [null, null]
-    const [a1, a2] = groupTop2[def.awayGroup] ?? [null, null]
-    result[def.slotId] = {
-      home: def.homeRank === 1 ? h1 : h2,
-      away: def.awayRank === 1 ? a1 : a2,
-    }
-  }
-
-  const getWinner = (slotId: string): string | null => {
-    const teams = result[slotId]
-    if (!teams?.home || !teams?.away) return null
-    const pred = koPredictions[slotId]
-    if (!pred) return null
-    if (pred.homeScore > pred.awayScore) return teams.home
-    if (pred.awayScore > pred.homeScore) return teams.away
-    return null
-  }
-
-  const getLoser = (slotId: string): string | null => {
-    const teams = result[slotId]
-    if (!teams?.home || !teams?.away) return null
-    const pred = koPredictions[slotId]
-    if (!pred) return null
-    if (pred.homeScore > pred.awayScore) return teams.away
-    if (pred.awayScore > pred.homeScore) return teams.home
-    return null
-  }
-
-  for (const def of KO_R16_DEFS) {
-    result[def.slotId] = { home: getWinner(def.slot1), away: getWinner(def.slot2) }
-  }
-  for (const def of KO_QF_DEFS) {
-    result[def.slotId] = { home: getWinner(def.slot1), away: getWinner(def.slot2) }
-  }
-  for (const def of KO_SF_DEFS) {
-    result[def.slotId] = { home: getWinner(def.slot1), away: getWinner(def.slot2) }
-  }
-
-  result[KO_3RD_DEF.slotId] = {
-    home: getLoser(KO_3RD_DEF.slot1),
-    away: getLoser(KO_3RD_DEF.slot2),
-  }
-  result[KO_FINAL_DEF.slotId] = {
-    home: getWinner(KO_FINAL_DEF.slot1),
-    away: getWinner(KO_FINAL_DEF.slot2),
-  }
-
-  return result
-}
-
-// ─── Knockout match row ───────────────────────────────────────────────────────
-
-function KoMatchRow({ slotId, label, home, away }: {
-  slotId: string
-  label: string
-  home: string | null
-  away: string | null
-}) {
-  const { predictions, confirmPrediction } = usePredictionStore()
-  const userId = useAuthStore(s => s.user?.id ?? 'me')
-  const existing = predictions[slotId]
-
-  const [expanded, setExpanded] = useState(false)
-  const [homeScore, setHomeScore] = useState(existing?.homeScore ?? 0)
-  const [awayScore, setAwayScore] = useState(existing?.awayScore ?? 0)
-  const [saveError, setSaveError] = useState<string | null>(null)
-
-  const homeTeam = home ? TEAMS[home] : null
-  const awayTeam = away ? TEAMS[away] : null
-  const isTBD = !home || !away
-  const hasPick = !!existing && !isTBD
-
-  const handleConfirm = () => {
-    setSaveError(null)
-    const result = confirmPrediction({
-      id: `pred-${slotId}`,
-      userId,
-      matchId: slotId,
-      homeScore,
-      awayScore,
-      submittedAt: new Date().toISOString(),
-    })
-    if (!result.ok) {
-      setSaveError(result.error ?? 'Erro ao salvar palpite.')
-      return
-    }
-    setExpanded(false)
-  }
-
-  const toggle = () => {
-    if (isTBD) return
-    if (!expanded && existing) {
-      setHomeScore(existing.homeScore)
-      setAwayScore(existing.awayScore)
-    }
-    setExpanded(v => !v)
-  }
-
-  return (
-    <div className="border-b border-hairline last:border-0">
-      <button
-        onClick={toggle}
-        className={cn(
-          'w-full px-4 py-3.5 flex items-center gap-3 text-left transition-colors',
-          !isTBD ? 'hover:bg-paper-deep cursor-pointer' : 'cursor-default opacity-50',
-          hasPick ? 'bg-green/[0.04]' : '',
-        )}
-      >
-        {/* Home */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          {homeTeam
-            ? <Flag team={homeTeam} size={32} />
-            : <div className="w-8 h-8 rounded-full bg-hairline border border-ink/10 flex-shrink-0 flex items-center justify-center">
-                <span className="font-mono text-[7px] text-ink-4">?</span>
-              </div>
-          }
-          <div className="min-w-0">
-            <div className="font-mono text-[11px] font-bold leading-tight">{home ?? 'A DEFINIR'}</div>
-            {homeTeam && (
-              <div className="font-mono text-[9px] text-ink-4 truncate leading-tight">{homeTeam.name}</div>
-            )}
-          </div>
-        </div>
-
-        {/* Center */}
-        <div className="flex flex-col items-center gap-0.5 flex-shrink-0 min-w-[72px]">
-          <span className="font-mono text-[8px] text-ink-4 mb-0.5">{label}</span>
-          {hasPick ? (
-            <div className="flex items-center gap-1">
-              <span className="font-display text-xl text-green">{existing.homeScore}–{existing.awayScore}</span>
-              <span className="font-mono text-[9px] text-green">✓</span>
-            </div>
-          ) : (
-            <span className="font-mono text-[9px] text-ink-3">
-              {isTBD ? 'aguardando' : 'palpitar'}
-            </span>
-          )}
-        </div>
-
-        {/* Away */}
-        <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-          <div className="min-w-0 text-right">
-            <div className="font-mono text-[11px] font-bold leading-tight">{away ?? 'A DEFINIR'}</div>
-            {awayTeam && (
-              <div className="font-mono text-[9px] text-ink-4 truncate leading-tight">{awayTeam.name}</div>
-            )}
-          </div>
-          {awayTeam
-            ? <Flag team={awayTeam} size={32} />
-            : <div className="w-8 h-8 rounded-full bg-hairline border border-ink/10 flex-shrink-0 flex items-center justify-center">
-                <span className="font-mono text-[7px] text-ink-4">?</span>
-              </div>
-          }
-        </div>
-
-        {!isTBD && (
-          <span className="font-mono text-[9px] text-ink-4 flex-shrink-0 w-3 text-center">
-            {expanded ? '▲' : '▼'}
-          </span>
-        )}
-      </button>
-
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            key="ko-picker"
-            initial={{ height: 0 }}
-            animate={{ height: 'auto' }}
-            exit={{ height: 0 }}
-            transition={{ type: 'spring', damping: 32, stiffness: 400 }}
-            className="overflow-hidden"
-          >
-            <div className="px-4 pt-5 pb-5 bg-paper-deep border-t border-hairline">
-              <p className="font-mono text-[9px] tracking-eyebrow text-ink-3 text-center mb-1">
-                QUAL VAI SER O PLACAR? · {label}
-              </p>
-              <p className="font-mono text-[8px] text-ink-4 text-center mb-5">
-                Empate → prorrogação / pênaltis (não avança no seu palpite)
-              </p>
-
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex flex-col items-center gap-2 flex-1">
-                  {homeTeam && <Flag team={homeTeam} size={44} />}
-                  <span className="font-mono text-[9px] font-bold text-center leading-tight">
-                    {home}
-                  </span>
-                  <ScoreInput value={homeScore} onChange={setHomeScore} />
-                </div>
-
-                <span className="font-serif-it text-3xl text-ink-3 flex-shrink-0 mb-6">×</span>
-
-                <div className="flex flex-col items-center gap-2 flex-1">
-                  {awayTeam && <Flag team={awayTeam} size={44} />}
-                  <span className="font-mono text-[9px] font-bold text-center leading-tight">
-                    {away}
-                  </span>
-                  <ScoreInput value={awayScore} onChange={setAwayScore} />
-                </div>
-              </div>
-
-              {saveError && (
-                <p className="font-mono text-[10px] text-red text-center mt-3 border border-red/30 bg-red/5 px-2 py-1.5">
-                  {saveError}
-                </p>
-              )}
-
-              <button onClick={handleConfirm} className="btn-yellow w-full text-[11px] py-3 mt-3 tracking-eyebrow font-bold">
-                {hasPick ? 'ATUALIZAR PALPITE ✓' : 'CONFIRMAR PALPITE ✓'}
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-// ─── Knockout tab ─────────────────────────────────────────────────────────────
 
 function KnockoutTab() {
-  const [activeRound, setActiveRound] = useState<KoRound>('r32')
-  const { predictions, lastError, clearError } = usePredictionStore()
   const allMatches = useMatchesWithStatus(WC2026_MATCHES)
-
-  const groupPredMap = useMemo(() => {
-    const m: Record<string, { homeScore: number; awayScore: number }> = {}
-    for (const [matchId, pred] of Object.entries(predictions)) {
-      if (!matchId.startsWith('ko-')) {
-        m[matchId] = { homeScore: pred.homeScore, awayScore: pred.awayScore }
-      }
-    }
-    return m
-  }, [predictions])
-
-  const koPredMap = useMemo(() => {
-    const m: Record<string, { homeScore: number; awayScore: number }> = {}
-    for (const [matchId, pred] of Object.entries(predictions)) {
-      if (matchId.startsWith('ko-')) {
-        m[matchId] = { homeScore: pred.homeScore, awayScore: pred.awayScore }
-      }
-    }
-    return m
-  }, [predictions])
-
-  const koTeams = useMemo(
-    () => resolveKoTeams(groupPredMap, koPredMap, allMatches),
-    [groupPredMap, koPredMap, allMatches]
-  )
-
-  const hasGroupPreds = Object.keys(groupPredMap).length > 0
-
-  const countPicked = useMemo(() => {
-    const counts: Record<KoRound, number> = { r32: 0, r16: 0, qf: 0, sf: 0, final: 0 }
-    for (const [key] of Object.entries(koPredMap)) {
-      if (key.startsWith('ko-r32-'))        counts.r32++
-      else if (key.startsWith('ko-r16-'))   counts.r16++
-      else if (key.startsWith('ko-qf-'))    counts.qf++
-      else if (key.startsWith('ko-sf-'))    counts.sf++
-      else if (key.startsWith('ko-final-') || key.startsWith('ko-3rd-')) counts.final++
-    }
-    return counts
-  }, [koPredMap])
-
-  const getRoundSlots = (round: KoRound) => {
-    switch (round) {
-      case 'r32':   return KO_R32_DEFS.map(d => ({ slotId: d.slotId, label: d.label }))
-      case 'r16':   return KO_R16_DEFS.map(d => ({ slotId: d.slotId, label: d.label }))
-      case 'qf':    return KO_QF_DEFS.map(d => ({ slotId: d.slotId, label: d.label }))
-      case 'sf':    return [...KO_SF_DEFS, KO_3RD_DEF].map(d => ({ slotId: d.slotId, label: d.label }))
-      case 'final': return [KO_FINAL_DEF].map(d => ({ slotId: d.slotId, label: d.label }))
-    }
-  }
-
-  const roundMaxCount: Record<KoRound, number> = { r32: 16, r16: 8, qf: 4, sf: 3, final: 1 }
-
-  const finalSlot = koTeams['ko-final-1']
-  const finalPred = koPredMap['ko-final-1']
-  const champion = finalPred && finalSlot?.home && finalSlot?.away
-    ? (finalPred.homeScore > finalPred.awayScore ? finalSlot.home
-      : finalPred.awayScore > finalPred.homeScore ? finalSlot.away : null)
-    : null
+  const koMatches = allMatches.filter(m => m.stage !== 'group')
 
   return (
     <div className="pb-24">
-      {/* Info banner */}
-      {!hasGroupPreds && (
-        <div className="mx-4 mt-4 p-4 border-2 border-yellow/60 bg-yellow/5 flex gap-3">
-          <span className="font-display text-2xl text-yellow/80 flex-shrink-0">!</span>
-          <div>
-            <p className="font-mono text-[10px] font-bold text-ink-3 mb-1">COMPLETE OS GRUPOS PRIMEIRO</p>
-            <p className="font-mono text-[10px] text-ink-4 leading-relaxed">
-              Faça seus palpites nos grupos para ver as seleções classificadas aqui automaticamente.
-              Você já pode palpitar os placares — os times aparecerão conforme você avança.
+      {koMatches.length === 0 ? (
+        /* ── Empty state: KO matches not in DB yet ── */
+        <div className="mx-4 mt-8 p-6 border-2 border-hairline text-center">
+          <div className="font-display text-5xl text-hairline mb-3">32</div>
+          <p className="font-display text-xl text-ink mb-2">MATA-MATA</p>
+          <p className="font-mono text-[11px] text-ink-3 leading-relaxed max-w-xs mx-auto">
+            As apostas do mata-mata abrirão a partir de <strong>27 Jun</strong>,
+            após a fase de grupos. As seleções classificadas aparecerão aqui automaticamente.
+          </p>
+          <div className="mt-5 pt-4 border-t border-hairline">
+            <p className="font-mono text-[9px] text-ink-4 tracking-eyebrow mb-1">ENQUANTO ISSO</p>
+            <p className="font-mono text-[10px] text-ink-3">
+              Complete os palpites da fase de grupos e veja
+              sua projeção em <strong>MINHA CHAVE</strong>.
             </p>
           </div>
         </div>
-      )}
-
-      {/* Round selector */}
-      <div className="sticky top-[44px] z-10 bg-paper border-b border-hairline flex overflow-x-auto">
-        {KO_ROUNDS.map(r => {
-          const picked = countPicked[r.id]
-          const max = roundMaxCount[r.id]
-          const done = picked === max
-          const active = activeRound === r.id
+      ) : (
+        /* ── Real KO matches from DB, grouped by stage ── */
+        KO_STAGE_ORDER.map(stage => {
+          const stageMatches = koMatches.filter(m => m.stage === stage)
+          if (stageMatches.length === 0) return null
           return (
-            <button
-              key={r.id}
-              onClick={() => setActiveRound(r.id)}
-              className={cn(
-                'flex flex-col items-center px-3 py-2.5 flex-1 min-w-[56px] border-r last:border-r-0 border-hairline transition-colors border-b-2',
-                active ? 'border-b-ink text-ink bg-paper' : 'border-b-transparent text-ink-3 hover:text-ink',
-              )}
-            >
-              <span className="font-mono text-[9px] font-bold tracking-eyebrow whitespace-nowrap">{r.short}</span>
-              <span className={cn('font-mono text-[7px] mt-0.5', done ? 'text-green' : 'text-ink-4')}>
-                {picked}/{max}{done ? ' ✓' : ''}
-              </span>
-            </button>
+            <div key={stage}>
+              <div className="px-4 py-3 border-b border-hairline bg-paper-deep flex items-center justify-between">
+                <span className="font-display text-base">{KO_STAGE_LABELS[stage]}</span>
+                <span className="font-mono text-[9px] text-ink-4">{stageMatches.length} partidas</span>
+              </div>
+              {stageMatches.map(match => (
+                <MatchRow key={match.id} match={match} />
+              ))}
+            </div>
           )
-        })}
-      </div>
-
-      {/* Round header */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between border-b border-hairline">
-        <span className="font-display text-xl">{KO_ROUNDS.find(r => r.id === activeRound)?.label}</span>
-        {activeRound === 'sf' && (
-          <span className="font-mono text-[9px] text-ink-3">inclui 3° lugar</span>
-        )}
-      </div>
-
-      {lastError && (
-        <div className="mx-4 mt-4 border border-red/30 bg-red/5 px-3 py-2 flex items-center justify-between gap-3">
-          <p className="font-mono text-[10px] text-red">{lastError}</p>
-          <button onClick={clearError} className="font-mono text-[10px] text-red underline">OK</button>
-        </div>
-      )}
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeRound}
-          initial={{ opacity: 0, x: 8 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -8 }}
-          transition={{ duration: 0.15 }}
-        >
-          {getRoundSlots(activeRound).map(({ slotId, label }) => {
-            const teams = koTeams[slotId] ?? { home: null, away: null }
-            return (
-              <KoMatchRow
-                key={slotId}
-                slotId={slotId}
-                label={label}
-                home={teams.home}
-                away={teams.away}
-              />
-            )
-          })}
-        </motion.div>
-      </AnimatePresence>
-
-      {/* Champion banner */}
-      {champion && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mx-4 mt-6 bg-ink text-paper p-4 border-2 border-ink shadow-[0_4px_0_0_#FFCB05] flex items-center gap-4"
-        >
-          <Flag team={TEAMS[champion]} size={52} ring />
-          <div>
-            <div className="font-mono text-[9px] text-paper/40 tracking-eyebrow">NO MEU PALPITE</div>
-            <div className="font-display text-2xl text-yellow leading-tight">{TEAMS[champion]?.name.toUpperCase()}</div>
-            <div className="font-mono text-[9px] text-paper/40 mt-0.5">CAMPEÃO COPA 2026</div>
-          </div>
-          <span className="font-display text-5xl ml-auto opacity-10">◆</span>
-        </motion.div>
+        })
       )}
 
       {/* Points guide */}
-      <div className="mx-4 mt-5 border border-hairline">
-        <div className="px-3 py-2 border-b border-hairline">
+      <div className="mx-4 mt-6 border border-hairline">
+        <div className="px-3 py-2 border-b border-hairline bg-paper-deep">
           <span className="font-mono text-[9px] tracking-eyebrow text-ink-3">PONTUAÇÃO MATA-MATA</span>
         </div>
-        {[
-          { pts: '+2',  label: 'Classificado acertado' },
-          { pts: '+5',  label: 'Resultado certo (vitória/derrota)' },
-          { pts: '+12', label: 'Placar exato acertado' },
-          { pts: '+25', label: 'Campeão correto' },
-        ].map(rule => (
-          <div key={rule.pts} className="flex items-center gap-3 px-3 py-2 border-b border-hairline last:border-0">
+        {KO_POINTS_GUIDE.map(rule => (
+          <div key={rule.pts} className="flex items-center gap-3 px-3 py-2.5 border-b border-hairline last:border-0">
             <span className="font-display text-lg text-green w-8">{rule.pts}</span>
             <span className="font-mono text-[10px] text-ink-3">{rule.label}</span>
           </div>
@@ -1065,6 +658,7 @@ function KnockoutTab() {
     </div>
   )
 }
+
 
 // ─── General picks validation ─────────────────────────────────────────────────
 
