@@ -34,7 +34,7 @@ export function MobileNav() {
               key={item.id}
               onClick={() => navigate(item.path)}
               className={cn(
-                'relative flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors',
+                'relative flex flex-col items-center justify-center gap-0.5 py-2.5 transition-all active:scale-90 active:opacity-60',
                 active ? 'text-ink' : 'text-ink-4'
               )}
             >

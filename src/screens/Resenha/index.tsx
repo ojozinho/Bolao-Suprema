@@ -445,13 +445,23 @@ export function ResenhaScreen() {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [atBottom,  setAtBottom]  = useState(true)
 
-  const scrollRef  = useRef<HTMLDivElement>(null)
-  const bottomRef  = useRef<HTMLDivElement>(null)
+  const scrollRef        = useRef<HTMLDivElement>(null)
+  const bottomRef        = useRef<HTMLDivElement>(null)
+  const didInitScrollRef = useRef(false)
 
-  // Auto-scroll only when user is at the bottom
   useEffect(() => {
+    if (!isLoaded) return
+    const el = scrollRef.current
+    if (!el) return
+    if (!didInitScrollRef.current) {
+      // instant jump on first render — avoids the "scroll from middle" bug on re-navigation
+      el.scrollTop = el.scrollHeight
+      didInitScrollRef.current = true
+      setAtBottom(true)
+      return
+    }
     if (atBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, atBottom])
+  }, [messages, atBottom, isLoaded])
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current

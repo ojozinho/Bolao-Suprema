@@ -7,7 +7,6 @@ export async function fetchRanking(myUserId?: string): Promise<RankingEntry[]> {
   const { data: users } = await supabase
     .from('users')
     .select('id, first_name, last_name, dept, initials, color, avatar_url, participant_status, privacy_hide_profile')
-    .eq('participant_status', 'active')
     .order('created_at', { ascending: true })
 
   if (!users?.length) return []
@@ -29,21 +28,24 @@ export async function fetchRanking(myUserId?: string): Promise<RankingEntry[]> {
   }
 
   const uniqueUsers = Array.from(new Map(users.map(u => [u.id, u])).values())
+    .filter(u => u.participant_status !== 'blocked')
+    .filter(u => u.first_name?.trim())   // hide users who never completed profile
     .filter(u => !u.privacy_hide_profile || u.id === myUserId)
 
   return uniqueUsers
     .map(u => ({
-      userId:   u.id,
-      name:     `${u.first_name} ${u.last_name}`.trim(),
-      dept:     u.dept ?? '',
-      initials: u.initials ?? '?',
-      color:    u.color ?? '#777',
-      pts:      pointsMap[u.id] ?? 0,
-      correct:  correctMap[u.id] ?? 0,
-      exact:    exactMap[u.id]   ?? 0,
-      streak:   0,
-      mov:      '—' as Mov,
-      isYou:    u.id === myUserId,
+      userId:    u.id,
+      name:      `${u.first_name} ${u.last_name}`.trim(),
+      dept:      u.dept ?? '',
+      initials:  u.initials ?? '?',
+      color:     u.color ?? '#777',
+      avatarUrl: u.avatar_url ?? undefined,
+      pts:       pointsMap[u.id] ?? 0,
+      correct:   correctMap[u.id] ?? 0,
+      exact:     exactMap[u.id]   ?? 0,
+      streak:    0,
+      mov:       '—' as Mov,
+      isYou:     u.id === myUserId,
     }))
     .sort((a, b) => b.pts - a.pts || b.exact - a.exact || b.correct - a.correct)
     .map((u, i) => ({ ...u, rank: i + 1 }))

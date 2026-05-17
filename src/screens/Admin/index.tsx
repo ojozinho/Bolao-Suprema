@@ -561,6 +561,114 @@ function ParticipantsPanel({ onToast }: { onToast: (msg: string, ok: boolean) =>
   )
 }
 
+// ─── Notices Panel ────────────────────────────────────────────────────────────
+
+interface NoticeRow {
+  id: string
+  title: string
+  body: string | null
+  created_at: string
+}
+
+function NoticesPanel({ onToast }: { onToast: (msg: string, ok: boolean) => void }) {
+  const [notices, setNotices] = useState<NoticeRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [title, setTitle]     = useState('')
+  const [body, setBody]       = useState('')
+  const [busy, setBusy]       = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('global_notices')
+      .select('id,title,body,created_at')
+      .order('created_at', { ascending: false })
+    setNotices((data ?? []) as NoticeRow[])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { if (!isMockMode) load() }, [load])
+
+  async function post() {
+    if (!title.trim()) return
+    setBusy(true)
+    const { error } = await supabase.from('global_notices').insert({ title: title.trim(), body: body.trim() || null })
+    if (error) { onToast(`Erro: ${error.message}`, false) }
+    else { onToast('✓ Aviso publicado', true); setTitle(''); setBody(''); await load() }
+    setBusy(false)
+  }
+
+  async function remove(id: string) {
+    setBusy(true)
+    const { error } = await supabase.from('global_notices').delete().eq('id', id)
+    if (error) { onToast(`Erro: ${error.message}`, false) }
+    else { onToast('✓ Aviso removido', true); await load() }
+    setBusy(false)
+  }
+
+  return (
+    <section className="border-2 border-ink mb-6">
+      <div className="px-4 py-3 bg-ink text-paper flex items-center justify-between gap-3">
+        <div>
+          <div className="font-display text-xl">AVISOS GLOBAIS</div>
+          <div className="font-mono text-[9px] text-paper/50">Aparecem na aba Avisos para todos</div>
+        </div>
+        <button disabled={busy || loading} onClick={load} className="btn-yellow text-[10px]">↺</button>
+      </div>
+
+      {/* New notice form */}
+      <div className="px-4 py-4 border-b border-hairline space-y-2">
+        <input
+          value={title} onChange={e => setTitle(e.target.value)}
+          placeholder="Título do aviso *"
+          className="w-full bg-paper-deep border border-line px-3 py-2 font-sans text-[13px] outline-none focus:border-ink placeholder:text-ink-4"
+        />
+        <textarea
+          value={body} onChange={e => setBody(e.target.value)}
+          placeholder="Texto do aviso (opcional)"
+          rows={2}
+          className="w-full bg-paper-deep border border-line px-3 py-2 font-sans text-[13px] outline-none focus:border-ink placeholder:text-ink-4 resize-none"
+        />
+        <button
+          disabled={!title.trim() || busy}
+          onClick={post}
+          className="btn-yellow text-[10px] disabled:opacity-40"
+        >
+          PUBLICAR AVISO
+        </button>
+      </div>
+
+      {/* Existing notices */}
+      {loading ? (
+        <div className="px-4 py-4 font-mono text-[11px] text-ink-4 animate-pulse">CARREGANDO…</div>
+      ) : notices.length === 0 ? (
+        <div className="px-4 py-4 font-mono text-[11px] text-ink-4">Nenhum aviso publicado.</div>
+      ) : (
+        <div className="divide-y divide-hairline max-h-64 overflow-y-auto">
+          {notices.map(n => (
+            <div key={n.id} className="flex items-start gap-3 px-4 py-3">
+              <div className="flex-1 min-w-0">
+                <div className="font-mono text-[11px] font-bold truncate">{n.title}</div>
+                {n.body && <div className="font-mono text-[10px] text-ink-3 mt-0.5 line-clamp-2">{n.body}</div>}
+                <div className="font-mono text-[9px] text-ink-4 mt-1">
+                  {new Date(n.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+              <button
+                disabled={busy}
+                onClick={() => remove(n.id)}
+                className="font-mono text-[8px] text-red border border-red/30 px-2 py-1 hover:bg-red/10 transition-colors flex-shrink-0 mt-1"
+              >
+                REMOVER
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export function AdminScreen() {
@@ -641,6 +749,7 @@ function AdminMobile() {
       )}
 
       <div className="px-4 pt-3">
+        <NoticesPanel onToast={showToast} />
         <ParticipantsPanel onToast={showToast} />
       </div>
 
@@ -758,6 +867,7 @@ function AdminDesktop() {
           </div>
         )}
 
+        <NoticesPanel onToast={showToast} />
         <ParticipantsPanel onToast={showToast} />
 
         <div className="grid grid-cols-[1.6fr_1fr] gap-5">

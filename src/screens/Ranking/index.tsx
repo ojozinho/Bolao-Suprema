@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/shared/Avatar'
 import { Eyebrow } from '@/components/shared/Eyebrow'
 import { useIsDesktop } from '@/hooks/useBreakpoint'
@@ -52,16 +53,20 @@ export function RankingScreen() {
 // ─── Row component ─────────────────────────────────────────────────────────────
 
 function RankingRow({ r, large = false }: { r: RankingEntry; large?: boolean }) {
+  const navigate = useNavigate()
   return (
-    <div className={cn(
-      'flex items-center gap-3 border-b border-hairline',
-      r.isYou ? 'bg-yellow' : 'hover:bg-paper-deep/50',
-      large ? 'px-5 py-3.5' : 'px-4 py-2.5'
-    )}>
+    <div
+      onClick={() => navigate(`/u/${r.userId}`)}
+      className={cn(
+        'flex items-center gap-3 border-b border-hairline cursor-pointer transition-colors',
+        r.isYou ? 'bg-yellow hover:bg-yellow/80' : 'hover:bg-paper-deep',
+        large ? 'px-5 py-3.5' : 'px-4 py-2.5'
+      )}
+    >
       <span className={cn('font-display flex-shrink-0', large ? 'text-3xl w-9' : 'text-2xl w-7')}>
         {r.rank}º
       </span>
-      <Avatar initials={r.initials} color={r.color} size={large ? 36 : 28} />
+      <Avatar initials={r.initials} color={r.color} src={r.avatarUrl} size={large ? 36 : 28} />
       <div className="flex-1 min-w-0">
         <div className={cn('font-mono font-bold truncate', large ? 'text-[13px]' : 'text-[12px]')}>
           {r.name}
@@ -207,7 +212,7 @@ function RankingMobile() {
               const ranks = [2, 1, 3]
               return (
                 <div key={r.userId} className="flex flex-col items-center gap-2 flex-1 max-w-[100px]">
-                  <Avatar initials={r.initials} color={r.color} size={ranks[i] === 1 ? 44 : 36} />
+                  <Avatar initials={r.initials} color={r.color} src={r.avatarUrl} size={ranks[i] === 1 ? 44 : 36} />
                   <div className="font-mono text-[10px] font-bold text-center truncate px-1">
                     {r.name.split(' ')[0]}
                   </div>
@@ -281,6 +286,7 @@ function RankingMobile() {
 // ─── Desktop ──────────────────────────────────────────────────────────────────
 
 function RankingDesktop() {
+  const navigate = useNavigate()
   const meUser = useAuthStore(s => s.user)
   const { ranking, loading } = useRanking()
   const rules = useScoring()
@@ -313,7 +319,7 @@ function RankingDesktop() {
                   const heights = [100, 132, 88]
                   return (
                     <div key={r.userId} className="flex flex-col items-center gap-2 flex-1">
-                      <Avatar initials={r.initials} color={r.color} size={ranks[i] === 1 ? 52 : 40} />
+                      <Avatar initials={r.initials} color={r.color} src={r.avatarUrl} size={ranks[i] === 1 ? 52 : 40} />
                       <div className="font-mono text-[11px] font-bold text-center">{r.name}</div>
                       <div className="font-mono text-[10px] text-ink-3">{r.dept}</div>
                       <div
@@ -343,13 +349,13 @@ function RankingDesktop() {
                 <span className="text-right">PTS</span>
               </div>
               {ranking.length > 0 ? ranking.map(r => (
-                <div key={r.userId} className={cn(
-                  'grid grid-cols-[40px_1fr_100px_48px_48px_48px_80px] gap-2 items-center px-5 py-2.5 border-b border-hairline',
-                  r.isYou ? 'bg-yellow' : 'hover:bg-paper-deep/40'
+                <div key={r.userId} onClick={() => navigate(`/u/${r.userId}`)} className={cn(
+                  'grid grid-cols-[40px_1fr_100px_48px_48px_48px_80px] gap-2 items-center px-5 py-2.5 border-b border-hairline cursor-pointer transition-colors',
+                  r.isYou ? 'bg-yellow hover:bg-yellow/80' : 'hover:bg-paper-deep/40'
                 )}>
                   <span className="font-display text-2xl">{r.rank}</span>
                   <div className="flex items-center gap-2 min-w-0">
-                    <Avatar initials={r.initials} color={r.color} size={28} />
+                    <Avatar initials={r.initials} color={r.color} src={r.avatarUrl} size={28} />
                     <div className="min-w-0">
                       <div className="font-mono text-[12px] font-bold truncate">{r.name}</div>
                       <span className={cn('font-mono text-[10px]', MOV_COLOR(r.mov))}>{r.mov}</span>

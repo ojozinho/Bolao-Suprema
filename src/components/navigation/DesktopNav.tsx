@@ -56,8 +56,10 @@ export function DesktopNav() {
                 key={item.id}
                 onClick={() => navigate(item.path)}
                 className={cn(
-                  'px-3 py-1.5 font-mono text-[11px] font-bold tracking-eyebrow uppercase transition-colors rounded-sm',
-                  active ? 'bg-ink text-paper' : 'text-ink-3 hover:text-ink hover:bg-hairline'
+                  'px-3 py-1.5 font-mono text-[11px] font-bold tracking-eyebrow uppercase transition-all active:scale-95 active:opacity-70',
+                  active
+                    ? 'bg-ink text-paper'
+                    : 'text-ink-3 hover:text-ink hover:bg-hairline'
                 )}
               >
                 {item.label}
