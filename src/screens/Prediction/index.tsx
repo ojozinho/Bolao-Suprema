@@ -559,7 +559,21 @@ function GroupsTab() {
         />
       </div>
 
+      {/* Points guide */}
+      <div className="mx-4 mt-2 mb-2 border border-hairline">
+        <div className="px-3 py-2 border-b border-hairline bg-paper-deep">
+          <span className="font-mono text-[9px] tracking-eyebrow text-ink-3">PONTUAÇÃO FASE DE GRUPOS</span>
+        </div>
+        {GROUP_POINTS_GUIDE.map(rule => (
+          <div key={rule.pts} className="flex items-center gap-3 px-3 py-2 border-b border-hairline last:border-0">
+            <span className="font-display text-lg text-green w-8">{rule.pts}</span>
+            <span className="font-mono text-[10px] text-ink-3">{rule.label}</span>
+          </div>
+        ))}
+      </div>
+
       {/* Group complete banner */}
+
       {doneInGroup === totalInGroup && standings.length >= 2 && (
         <motion.div
           initial={{ opacity: 0, y: 6 }}
@@ -583,6 +597,13 @@ function GroupsTab() {
 }
 
 // ─── Knockout tab ─────────────────────────────────────────────────────────────
+
+const GROUP_POINTS_GUIDE = [
+  { pts: '+10', label: 'Placar exato' },
+  { pts: '+7',  label: 'Resultado + gols do vencedor' },
+  { pts: '+5',  label: 'Resultado correto (V/E/D)' },
+  { pts: '+1',  label: 'Gols de uma equipe acertados' },
+]
 
 const KO_STAGE_LABELS: Record<string, string> = {
   round_of_32:   'RODADA DE 32',

@@ -24,8 +24,8 @@ export async function fetchRanking(myUserId?: string): Promise<RankingEntry[]> {
     if (!row.user_id) continue
     const p = row.points_earned ?? 0
     pointsMap[row.user_id] = (pointsMap[row.user_id] ?? 0) + p
-    if (p >= 3) correctMap[row.user_id] = (correctMap[row.user_id] ?? 0) + 1
-    if (p >= 10) exactMap[row.user_id]  = (exactMap[row.user_id]   ?? 0) + 1
+    if (p >= 5)  correctMap[row.user_id] = (correctMap[row.user_id] ?? 0) + 1
+    if (p >= 10) exactMap[row.user_id]   = (exactMap[row.user_id]   ?? 0) + 1
   }
 
   const uniqueUsers = Array.from(new Map(users.map(u => [u.id, u])).values())
@@ -45,6 +45,6 @@ export async function fetchRanking(myUserId?: string): Promise<RankingEntry[]> {
       mov:      '—' as Mov,
       isYou:    u.id === myUserId,
     }))
-    .sort((a, b) => b.pts - a.pts)
+    .sort((a, b) => b.pts - a.pts || b.exact - a.exact || b.correct - a.correct)
     .map((u, i) => ({ ...u, rank: i + 1 }))
 }

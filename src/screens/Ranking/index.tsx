@@ -97,22 +97,51 @@ function EmptyRanking() {
   )
 }
 
-function ScoringRulesBox({ rules }: { rules: ScoringRule[] }) {
-  const visible = rules.length > 0 ? rules : [
-    { id: 'group_exact', label: 'Placar exato', points: 10, category: 'match', stage: 'group', sortOrder: 1, isActive: true },
-    { id: 'group_result', label: 'Acertar vencedor/empate', points: 5, category: 'match', stage: 'group', sortOrder: 2, isActive: true },
-    { id: 'champion', label: 'Campeao', points: 25, category: 'general', stage: 'all', sortOrder: 3, isActive: true },
-    { id: 'runner_up', label: 'Vice', points: 15, category: 'general', stage: 'all', sortOrder: 4, isActive: true },
-    { id: 'top_scorer', label: 'Artilheiro', points: 10, category: 'general', stage: 'all', sortOrder: 5, isActive: true },
-  ]
+const SCORING_SECTIONS = [
+  {
+    label: 'FASE DE GRUPOS',
+    rules: [
+      { pts: 10, label: 'Placar exato' },
+      { pts: 7,  label: 'Resultado + gols do vencedor' },
+      { pts: 5,  label: 'Resultado correto (V/E/D)' },
+      { pts: 1,  label: 'Gols de uma equipe acertados' },
+    ],
+  },
+  {
+    label: 'MATA-MATA',
+    rules: [
+      { pts: 12, label: 'Placar exato (tempo regulamentar)' },
+      { pts: 8,  label: 'Resultado + gols de um time' },
+      { pts: 5,  label: 'Resultado correto' },
+      { pts: 2,  label: 'Classificado (incl. prorr./pênaltis)' },
+    ],
+  },
+  {
+    label: 'APOSTAS GERAIS',
+    rules: [
+      { pts: 25, label: 'Campeão' },
+      { pts: 15, label: 'Vice-campeão' },
+      { pts: 10, label: 'Artilheiro (+ critério de desempate)' },
+    ],
+  },
+]
+
+function ScoringRulesBox({ rules: _rules }: { rules: ScoringRule[] }) {
   return (
     <div className="border-2 border-ink p-4">
       <p className="font-mono text-[10px] tracking-eyebrow text-ink-3 mb-3">COMO PONTUAR</p>
-      <div className="space-y-2">
-        {visible.filter(r => r.isActive).slice(0, 9).map(rule => (
-          <div key={rule.id} className="flex items-center gap-2">
-            <span className="font-display text-xl text-green w-8 flex-shrink-0">+{rule.points}</span>
-            <span className="font-mono text-[11px] text-ink-3">{rule.label}</span>
+      <div className="space-y-4">
+        {SCORING_SECTIONS.map(section => (
+          <div key={section.label}>
+            <p className="font-mono text-[8px] tracking-eyebrow text-ink-4 mb-1.5">{section.label}</p>
+            <div className="space-y-1.5">
+              {section.rules.map(r => (
+                <div key={r.label} className="flex items-center gap-2">
+                  <span className="font-display text-xl text-green w-8 flex-shrink-0">+{r.pts}</span>
+                  <span className="font-mono text-[11px] text-ink-3">{r.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </div>
@@ -223,23 +252,8 @@ function RankingMobile() {
       </div>
 
       {tab === 'geral' && ranking.length === 0 && (
-        <div className="mx-4 mt-4 border-2 border-ink p-4">
-          <p className="font-mono text-[10px] tracking-eyebrow text-ink-3 mb-3">COMO PONTUAR</p>
-          <div className="space-y-2">
-            {[
-              { pts: '10', label: 'Placar exato' },
-              { pts: '7',  label: 'Resultado + gols de 1 time' },
-              { pts: '5',  label: 'Só o vencedor' },
-              { pts: '25', label: 'Campeão (aposta geral)' },
-              { pts: '15', label: 'Vice-campeão' },
-              { pts: '10', label: 'Artilheiro' },
-            ].map(r => (
-              <div key={r.label} className="flex items-center gap-2">
-                <span className="font-display text-xl text-green w-8 flex-shrink-0">+{r.pts}</span>
-                <span className="font-mono text-[11px] text-ink-3">{r.label}</span>
-              </div>
-            ))}
-          </div>
+        <div className="mx-4 mt-4">
+          <ScoringRulesBox rules={[]} />
         </div>
       )}
 
@@ -390,24 +404,7 @@ function RankingDesktop() {
             )}
 
             {/* Pontuação */}
-            <div className="border-2 border-ink p-4">
-              <p className="font-mono text-[10px] tracking-eyebrow text-ink-3 mb-3">COMO PONTUAR</p>
-              <div className="space-y-2">
-                {[
-                  { pts: '10', label: 'Placar exato' },
-                  { pts: '7',  label: 'Resultado + gols de 1 time' },
-                  { pts: '5',  label: 'Só o vencedor' },
-                  { pts: '25', label: 'Campeão (aposta geral)' },
-                  { pts: '15', label: 'Vice-campeão' },
-                  { pts: '10', label: 'Artilheiro' },
-                ].map(r => (
-                  <div key={r.label} className="flex items-center gap-2">
-                    <span className="font-display text-xl text-green w-8 flex-shrink-0">+{r.pts}</span>
-                    <span className="font-mono text-[11px] text-ink-3">{r.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ScoringRulesBox rules={rules} />
           </div>
         </div>
       </div>
